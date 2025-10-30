@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monthly Meal Register App</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Custom configuration for Tailwind -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        'primary-blue': '#3B82F6',
+                        'light-gray': '#F9FAFB',
+                        'border-subtle': '#E5E7EB',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Apply Inter font family and smooth transitions */
+        body {
+            font-family: 'Inter', 'sans-serif';
+            background-color: #F3F4F6; /* Light gray background */
+        }
+
+        /* Essential scroll container for sticky elements */
+        #table-container {
+            overflow: auto;
+            max-height: 85vh; /* Keep it visible on most screens */
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            background-color: white;
+            border-radius: 12px;
+            border: 1px solid #E5E7EB;
+        }
+
+        /* Sticky header (Day numbers: 1 to 31) */
+        .sticky-header {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            background-color: #F9FAFB; /* Light header background */
+        }
+
+        /* Sticky first column (Serial and Name) */
+        .sticky-col-left {
+            position: sticky;
+            left: 0;
+            z-index: 11; /* Higher than header to stay on top */
+            background-color: #EBF1F7; /* Subtle blue-gray for the person column */
+        }
+
+        /* Sticky last column (Total Meal) - Updated background for clarity */
+        .sticky-col-right {
+            position: sticky;
+            right: 0;
+            z-index: 9;
+            background-color: #EBF1F7; /* Subtle gray for the total column */
+            font-weight: 600;
+        }
+
+        /* Make right header cell sticky on scroll */
+        .sticky-col-right.sticky-header {
+            position: sticky;
+            right: 0;
+            top: 0;
+            z-index: 12; /* higher than table body */
+            background-color: #DDE6EF; /* same tone as left corner cell */
+        }
+
+        /* Ensure corner (Top-Left cell) is on top of both sticky axis */
+        .sticky-col-left.sticky-header {
+            z-index: 12;
+            background-color: #DDE6EF; /* Darker corner for emphasis */
+        }
+
+        /* Custom input styling for meal entries */
+        .meal-input {
+            width: 100%;
+            height: 40px;
+            text-align: center;
+            border: none;
+            padding: 0 4px;
+            transition: all 0.1s ease-in-out;
+            background-color: transparent;
+        }
+        .meal-input:focus {
+            outline: 2px solid #60A5FA; /* Blue focus ring */
+            background-color: #EBF8FF; /* Light blue on focus */
+        }
+
+        /* Table cells padding and borders */
+        th, td {
+            border: 1px solid #E5E7EB;
+            padding: 0;
+            white-space: nowrap; /* Prevent wrapping in cells */
+            min-width: 50px; /* Default width for day cells */
+        }
+        /* Name and Serial cell padding is handled by the input/label for better visual control */
+        .name-cell, .serial-cell {
+            padding: 0; 
+            text-align: left;
+            min-width: 100px;
+            max-width: 150px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        /* Specific styling for the editable name input */
+        .name-input {
+            padding: 8px 12px !important; /* Ensure name input has proper padding */
+            text-align: left !important;
+            width: 100%;
+            height: 100% !important; /* Ensure input fills the cell vertically */
+            font-weight: 500;
+            color: #1F2937; /* Darker text */
+            border: none; /* Remove default input border */
+            background-color: transparent;
+        }
+        .name-input::placeholder {
+            color: #9CA3AF; /* Light gray placeholder */
+        }
+        .name-input:focus {
+            background-color: #EBF8FF;
+            outline: none;
+            box-shadow: 0 0 0 1px #60A5FA inset;
+        }
+
+        /* Style for the inline totals displayed next to the name (Not used, but keeping CSS definitions clean) */
+        .inline-total-display {
+            font-size: 0.7rem; /* Smaller text for compact display */
+            line-height: 1.2;
+            padding: 4px 12px;
+            margin-top: 4px;
+            border-top: 1px dashed #BFDBFE; /* Subtle separator line */
+            background-color: #EBF1F7; /* Match sticky left background */
+        }
+        .inline-total-display > div > span:last-child {
+            font-weight: 700;
+        }
+
+        /* Styling for the Guest Meal row */
+        .guest-row td {
+            background-color: #EBF1F7 /* Light pink background */
+        }
+
+        /* Add a visible space between person groups */
+        .person-group-end {
+            border-bottom: 2px solid #60A5FA; /* Stronger border line */
+        }
+
+        /* Styling for sticky right total display components */
+        .total-cell-tm, .total-cell-gm, .total-cell-combined {
+            padding: 4px 8px;
+            font-size: 0.8rem;
+            line-height: 1.2;
+            text-align: right;
+            border: none;
+        }
+        .total-cell-tm { color: #10B981; } /* Green for Total Meal */
+        .total-cell-gm { color: #EF4444; } /* Red for Guest Meal */
+        .total-cell-combined { 
+            color: #3B82F6; /* Primary Blue for Combined Total */
+            font-weight: 700;
+            padding-top: 8px; /* Add padding above to separate from TM/GM */
+            border-top: 1px dashed #BFDBFE; /* Subtle separator line */
+        }
+
+        /* Responsive adjustments for smaller screens */
+        @media (max-width: 768px) {
+            .name-cell, .serial-cell {
+                min-width: 80px;
+            }
+            th, td {
+                min-width: 40px;
+            }
+            .total-cell-tm, .total-cell-gm, .total-cell-combined {
+                font-size: 0.7rem;
+            }
+        }
+
+        input[type=number]::-webkit-outer-spin-button,
+        input[type=number]::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <!-- Header Section -->
+    <header class="mb-6 md:mb-8 text-center bg-white p-4 rounded-xl shadow-lg border border-border-subtle">
+        <h1 id="month-header" class="text-3xl md:text-4xl font-extrabold text-primary-blue tracking-tight">
+            <!-- Dynamic Month and Year will be injected here -->
+        </h1>
+        <p class="text-sm text-gray-500 mt-1">Real-time monthly Meal Register</p>
+        
+        <!-- NEW INPUT FOR DYNAMIC MEMBER COUNT -->
+        <div class="mt-4 flex justify-center items-center">
+        <label for="total-members-input" class="text-sm font-medium text-gray-700 mr-3">Total Members:</label>
+        <input 
+            type="number"
+            id="total-members-input"
+            class="w-20 p-2 border border-gray-300 rounded-lg text-center focus:ring-primary-blue focus:border-primary-blue"
+            min="1"
+            max="999"
+            value="20"
+            onchange="handleTotalMembersChange(event)"
+        >
+        </div>
+    </header>
+    
+    <!-- Message Box for Feedback (NEW LOCATION: Above the table) -->
+    <!-- <div id="message-box-container" class="relative w-full mb-4">
+        <div id="message-box" class="mx-auto w-full md:w-1/2 bg-green-500 text-white p-3 rounded-lg shadow-xl text-center hidden transition-all duration-300 transform opacity-0">
+            Saved!
+        </div>
+    </div> -->
+
+
+    <!-- Table Container -->
+    <div id="table-container" class="w-full">
+        <table id="meal-register-table" class="min-w-full border-collapse border border-border-subtle text-sm">
+            <!-- Table content will be generated by JavaScript -->
+        </table>
+    </div>
+
+    <script>
+        // --- Configuration and Initialization ---
+        // Removed hardcoded NUM_PEOPLE. Now uses global variable numPeople.
+        const KEY_DATA = 'mealRegisterData';
+        const KEY_MONTH = 'mealRegisterMonth';
+        const KEY_MEMBER_COUNT = 'mealRegisterMemberCount'; // New key for dynamic count
+        
+        let numPeople = 20; // Default startup value
+        
+        const table = document.getElementById('meal-register-table');
+        const monthHeader = document.getElementById('month-header');
+        const messageBox = document.getElementById('message-box');
+
+        // Global data store. Structure: Array of N objects.
+        let mealData = [];
+
+        /**
+         * Converts raw input value (string) to a number, defaulting to 0 for invalid inputs.
+         * @param {string} value - The input value string.
+         * @returns {number} The parsed number.
+         */
+        function parseInput(value) {
+            const num = parseFloat(value);
+            return isNaN(num) || num < 0 ? 0 : num;
+        }
+        
+        /**
+         * Formats a number to one decimal place, removing trailing .0 if it's a whole number.
+         * @param {number} num - The number to format.
+         * @returns {string} The formatted number string.
+         */
+        function formatNumber(num) {
+            // Check if the number is an integer (no fractional part)
+            if (num % 1 === 0) {
+                return num.toString();
+            }
+            // Otherwise, return it fixed to one decimal place
+            return num.toFixed(1);
+        }
+
+        // --- Core Data Management and Persistence ---
+
+        /**
+         * Resizes the mealData array to the new total size (newSize).
+         * Fills new entries with defaults or truncates if the new size is smaller.
+         * @param {number} newSize - The desired number of members.
+         */
+        function resizeMealData(newSize) {
+            const currentSize = mealData.length;
+
+            if (newSize > currentSize) {
+                // Add new members
+                for (let i = currentSize; i < newSize; i++) {
+                    mealData.push({
+                        name: `Member ${i + 1}`,
+                        meals: Array(31).fill(0),
+                        guestMeals: Array(31).fill(0)
+                    });
+                }
+            } else if (newSize < currentSize) {
+                // Truncate members
+                mealData = mealData.slice(0, newSize);
+            }
+            numPeople = newSize; // Update the global variable
+            saveData(false); // Save the resized structure without feedback
+        }
+
+        /**
+         * Creates a fresh data model based on the current numPeople.
+         */
+        function initializeNewData() {
+            mealData = Array.from({ length: numPeople }, (_, i) => ({
+                name: `Member ${i + 1}`, // Default name stored (used as placeholder if empty)
+                meals: Array(31).fill(0),
+                guestMeals: Array(31).fill(0)
+            }));
+            saveData(false); // Save the initial empty structure
+        }
+
+        /**
+         * Initializes the meal data, checking for a monthly reset condition.
+         * It loads data from localStorage or creates a new structure.
+         */
+        function initializeData() {
+            const currentDate = new Date();
+            const currentMonthYear = `${currentDate.getMonth() + 1}-${currentDate.getFullYear()}`;
+            const storedMonthYear = localStorage.getItem(KEY_MONTH);
+
+            // Set the header text
+            const monthNames = ["January", "February", "March", "April", "May", "June",
+                "July", "August", "September", "October", "November", "December"
+            ];
+            monthHeader.textContent = `${monthNames[currentDate.getMonth()]} ${currentDate.getFullYear()}`;
+
+            // 1. Monthly Reset Check: If the stored month is different, clear all data.
+            if (storedMonthYear && storedMonthYear !== currentMonthYear) {
+                console.log(`New month detected: ${currentMonthYear}. Resetting data from ${storedMonthYear}.`);
+                localStorage.removeItem(KEY_DATA);
+                localStorage.setItem(KEY_MONTH, currentMonthYear); // Set the new month
+                // window.location.reload(); // Required behavior, but kept commented for testing environments
+            } else if (!storedMonthYear) {
+                // First time setup
+                localStorage.setItem(KEY_MONTH, currentMonthYear);
+            }
+
+            // 2. Load or Initialize Member Count
+            const storedMemberCount = localStorage.getItem(KEY_MEMBER_COUNT);
+            if (storedMemberCount && parseInt(storedMemberCount) > 0) {
+                numPeople = parseInt(storedMemberCount);
+                // Update the input field with the stored value
+                const input = document.getElementById('total-members-input');
+                if (input) {
+                    input.value = numPeople;
+                }
+            } else {
+                localStorage.setItem(KEY_MEMBER_COUNT, numPeople); // Save default 20
+            }
+
+
+            // 3. Load or Initialize Meal Data
+            const storedData = localStorage.getItem(KEY_DATA);
+            if (storedData) {
+                // Load data from localStorage
+                try {
+                    mealData = JSON.parse(storedData);
+                    // Handle resizing of mealData based on stored count vs actual data length
+                    if (mealData.length !== numPeople) {
+                        console.log(`Resizing meal data from ${mealData.length} to ${numPeople}.`);
+                        resizeMealData(numPeople);
+                    }
+                    console.log("Data loaded from localStorage.");
+                } catch (e) {
+                    console.error("Error loading stored data, initializing new data.", e);
+                    initializeNewData();
+                }
+            } else {
+                // Initialize new, empty data structure
+                initializeNewData();
+            }
+        }
+
+        /**
+         * Saves the current mealData array to localStorage.
+         * @param {boolean} [showFeedback=true] - Whether to display the save message.
+         */
+        function saveData(showFeedback = true) {
+            try {
+                localStorage.setItem(KEY_DATA, JSON.stringify(mealData));
+                if (showFeedback) showSaveMessage();
+            } catch (e) {
+                console.error("Could not save data to localStorage.", e);
+            }
+        }
+
+        /**
+         * Shows a transient success message in the new central location.
+         */
+        function showSaveMessage() {
+            messageBox.classList.remove('hidden', 'bg-red-500', 'opacity-0');
+            messageBox.classList.add('bg-green-500', 'opacity-100');
+            messageBox.textContent = "Saved!"; 
+            
+            clearTimeout(messageBox.timeoutId);
+            messageBox.timeoutId = setTimeout(() => {
+                messageBox.classList.remove('opacity-100');
+                messageBox.classList.add('opacity-0');
+                // Hide fully after transition
+                setTimeout(() => {
+                    messageBox.classList.add('hidden');
+                }, 300); // Wait for the transition duration
+            }, 1500);
+        }
+
+        // --- Table Rendering ---
+        
+        /**
+         * Main function to render/re-render the entire table.
+         */
+        function renderTable() {
+            // Clear existing table content safely before re-rendering
+            table.innerHTML = ''; 
+            
+            renderTableHeader();
+            renderTableBody();
+        }
+
+        /**
+         * Dynamically generates the table header (Serial, Name, Days 1-31, Total Meal).
+         */
+        function renderTableHeader() {
+            const head = table.createTHead();
+            const row = head.insertRow();
+
+            // Corner cell
+            row.insertCell().outerHTML = `<th class="sticky-col-left sticky-header text-center" style="min-width: 50px;">S/N</th>`;
+            // Name cell
+            row.insertCell().outerHTML = `<th class="sticky-col-left sticky-header name-cell text-center" style="min-width: 150px; padding: 8px 12px;">Name</th>`;
+
+            // Day numbers (1 to 31)
+            for (let day = 1; day <= 31; day++) {
+                row.insertCell().outerHTML = `<th class="sticky-header text-center p-2">${day}</th>`;
+            }
+
+            // Total Meal cell (sticky right)
+            row.insertCell().outerHTML = `
+                <th class="sticky-col-right sticky-header text-center p-2" style="min-width: 120px;">
+                    Total Meal: <span id="grand-total" class="font-bold text-primary-blue">0</span>
+                </th>`;
+        }
+
+        /**
+         * Dynamically generates the table body with 2 rows for each person.
+         */
+        function renderTableBody() {
+            const body = table.createTBody();
+
+            mealData.forEach((person, personIndex) => {
+                const defaultName = `Member ${personIndex + 1}`;
+                // If the stored name is the default name, we leave the input value empty so the placeholder shows.
+                const displayName = person.name.startsWith('Member ') ? '' : person.name;
+
+                // --- 1. Main Meal Row ---
+                const mealRow = body.insertRow();
+                mealRow.id = `person-${personIndex}-meal-row`;
+                // Use numPeople to check the last row for border separation
+                if (personIndex < numPeople - 1) {
+                    mealRow.classList.add('border-b-0'); 
+                }
+
+                // Serial Number
+                let serialCell = mealRow.insertCell();
+                serialCell.classList.add('sticky-col-left', 'serial-cell', 'text-center', 'font-medium', 'p-3');
+                serialCell.rowSpan = 2; // Spans both Meal and Guest Meal row
+                serialCell.textContent = personIndex + 1;
+
+                // Name (Editable Input) - NO INLINE TOTAL DISPLAY
+                let nameCell = mealRow.insertCell();
+                nameCell.classList.add('sticky-col-left', 'name-cell', 'text-left');
+                nameCell.innerHTML = `
+                    <div class="flex flex-col h-full w-full justify-center">
+                        <input
+                            type="text"
+                            class="name-input"
+                            placeholder="${defaultName}"
+                            value="${displayName}"
+                            data-person="${personIndex}"
+                            oninput="handleNameInput(event)"
+                        >
+                    </div>
+                `;
+
+                // Day Inputs (Meals)
+                for (let day = 0; day < 31; day++) {
+                    const cell = mealRow.insertCell();
+                    cell.innerHTML = `<input
+                        type="number"
+                        min="0"
+                        class="meal-input text-gray-800"
+                        data-person="${personIndex}"
+                        data-type="meal"
+                        data-day="${day}"
+                        value="${person.meals[day] === 0 ? '' : person.meals[day]}"
+                        oninput="handleInput(event)"
+                    >`;
+                }
+
+                // Total Meal Display (TM: [Total], GM: [Total], Total: [Combined]) - Sticky Right
+                let totalCell = mealRow.insertCell();
+                totalCell.classList.add('sticky-col-right', 'text-sm', 'text-gray-800');
+                totalCell.rowSpan = 2;
+                totalCell.id = `total-display-${personIndex}`;
+                // Initial update will fill content
+
+                // --- 2. Guest Meal Row ---
+                const guestRow = body.insertRow();
+                guestRow.id = `person-${personIndex}-guest-row`;
+                guestRow.classList.add('guest-row', 'text-xs', 'text-gray-500');
+                // Use numPeople to check the last row for border separation
+                if (personIndex < numPeople - 1) {
+                    guestRow.classList.add('person-group-end'); // Strong border below guest row
+                }
+
+                // Guest Meal Label (takes the place of the Name cell)
+                let guestLabelCell = guestRow.insertCell();
+                guestLabelCell.classList.add('sticky-col-left', 'name-cell', 'text-left', 'italic', 'p-3');
+                guestLabelCell.textContent = 'Guest Meal';
+
+                // Day Inputs (Guest Meals)
+                for (let day = 0; day < 31; day++) {
+                    const cell = guestRow.insertCell();
+                    cell.innerHTML = `<input
+                        type="number"
+                        min="0"
+                        class="meal-input text-pink-700"
+                        data-person="${personIndex}"
+                        data-type="guest"
+                        data-day="${day}"
+                        value="${person.guestMeals[day] === 0 ? '' : person.guestMeals[day]}"
+                        oninput="handleInput(event)"
+                    >`;
+                }
+            });
+            // Calculate all totals on initial load
+            mealData.forEach((_, index) => updateTotal(index));
+            updateGrandTotal();
+        }
+
+        // --- Real-time Calculation and Event Handling ---
+
+        /**
+         * Handles input change for the Total Members field.
+         * @param {Event} event - The input event object.
+         */
+        function handleTotalMembersChange(event) {
+            let newCount = parseInt(event.target.value);
+            
+            // Validate input to be at least 1
+            if (isNaN(newCount) || newCount < 1) {
+                newCount = 1; 
+                event.target.value = newCount;
+            }
+
+            // Only update and re-render if the count actually changed
+            if (newCount !== numPeople) {
+                localStorage.setItem(KEY_MEMBER_COUNT, newCount);
+                resizeMealData(newCount);
+                renderTable(); // Re-render the whole table
+                showSaveMessage();
+            }
+        }
+        
+        /**
+         * Handles input changes in the Name field, updates data model, and saves data.
+         * @param {Event} event - The input event object.
+         */
+        function handleNameInput(event) {
+            const input = event.target;
+            const personIndex = parseInt(input.dataset.person);
+            const value = input.value.trim();
+            const defaultName = `Member ${personIndex + 1}`;
+
+            // 1. Update the data model (mealData array)
+            mealData[personIndex].name = value === '' ? defaultName : value;
+
+            // 2. Save the entire data structure to localStorage
+            saveData(true);
+        }
+
+        /**
+         * Calculates and updates the Total Meal (TM), Guest Meal (GM), and Combined Total displays for one person 
+         * only in the sticky right column.
+         * @param {number} personIndex - The index of the person in the mealData array.
+         */
+        function updateTotal(personIndex) {
+            const person = mealData[personIndex];
+
+            // Calculate totals
+            const totalMeal = person.meals.reduce((sum, value) => sum + parseInput(value), 0);
+            const totalGuestMeal = person.guestMeals.reduce((sum, value) => sum + parseInput(value), 0);
+            const totalCombined = totalMeal + totalGuestMeal; // Combined Total
+
+            // 1. Update the sticky right total cell (TM/GM/Total)
+            const rightDisplayCell = document.getElementById(`total-display-${personIndex}`);
+            if (rightDisplayCell) {
+                // Renders TM, GM, and Total regardless of zero value, as it is the primary total column
+                rightDisplayCell.innerHTML = `
+                    <div class="p-2">
+                        <div class="total-cell-tm flex justify-between"><span>Meal:</span><span>${formatNumber(totalMeal)}</span></div>
+                        <div class="total-cell-gm flex justify-between"><span>Guest:</span><span>${formatNumber(totalGuestMeal)}</span></div>
+                        <!-- Combined Total -->
+                        <div class="total-cell-combined flex justify-between"><span>Total:</span><span>${formatNumber(totalCombined)}</span></div>
+                    </div>
+                `;
+            }
+            updateGrandTotal(); // Update overall total after each person total recalculation
+        }
+
+        /**
+         * Updates the grand total (sum of all Total Meals + Guest Meals)
+         * and displays it in the header.
+         */
+        function updateGrandTotal() {
+            const total = mealData.reduce((sum, person) => {
+                const personTotal = person.meals.reduce((a, b) => a + parseInput(b), 0) +
+                                    person.guestMeals.reduce((a, b) => a + parseInput(b), 0);
+                return sum + personTotal;
+            }, 0);
+
+            const display = document.getElementById('grand-total');
+            if (display) display.textContent = formatNumber(total);
+        }
+
+        /**
+         * Handles input changes in real-time for meal and guest meal entries, 
+         * updates data model, saves data, and recalculates totals.
+         * @param {Event} event - The input event object.
+         */
+        function handleInput(event) {
+            const input = event.target;
+            const personIndex = parseInt(input.dataset.person);
+            const dayIndex = parseInt(input.dataset.day);
+            const type = input.dataset.type;
+            const value = parseInput(input.value);
+
+            // 1. Update the data model (mealData array)
+            if (type === 'meal') {
+                mealData[personIndex].meals[dayIndex] = value;
+            } else if (type === 'guest') {
+                mealData[personIndex].guestMeals[dayIndex] = value;
+            }
+
+            // 2. Clear the input if the value is 0 (for clean placeholder display)
+            if (value === 0) {
+                input.value = '';
+            } else {
+                // Ensure the input displays the parsed value
+                input.value = value;
+            }
+
+            // 3. Recalculate totals for the affected person (updates only the sticky right column)
+            updateTotal(personIndex);
+
+            // 4. Save the entire data structure to localStorage
+            saveData(true);
+        }
+
+        // --- Application Startup ---
+        window.onload = function() {
+            initializeData();
+            renderTable();
+        };
+
+    </script>
+
+    <div style="text-align:center; margin-top:20px; font-size:13px; color:#555;">
+    <span style="font-size:18px; vertical-align:middle;">&copy;</span>
+    <a href="https://www.facebook.com/officiall.sk" target="_blank" style="color:#3182ce; font-weight:bold; text-decoration:none; margin:0 1px; vertical-align:middle;">SK JISAN</a>
+    <span id="currentYear" style="vertical-align:middle;"></span>
+    </div>
+    <script>
+        document.getElementById('currentYear').textContent = new Date().getFullYear();
+    </script>
+
+</body>
+</html>
