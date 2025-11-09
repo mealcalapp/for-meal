@@ -11,21 +11,20 @@
     <style>
         #floatingButton {
             z-index: 100;
+            backdrop-filter: blur(2px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            background-color: rgba(100, 149, 237, 0.2); 
+            border: 1px solid rgba(100, 149, 237, 0.1);
+            border-radius: 9999px;
+            color: white;
+            box-shadow: 
+                0 8px 20px rgba(0, 0, 0, 0.3),
+                inset 0 1px 1px rgba(255, 255, 255, 0.3);
+            transition: all 0.3s ease-in-out;
         }
-        :root {
-            --fab-bg-color: #699ef5;
-            --fab-hover-color: #508ee0; 
-            --fab-ring-color: #b4cfff;
-        }
-        #floatingButton {
-            background-color: var(--fab-bg-color);
-            box-shadow: 0 10px 15px -3px rgba(105, 158, 245, 0.5), 0 4px 6px -2px rgba(105, 158, 245, 0.2); 
-            transition: all 0.3s ease;
-            border: 4px solid var(--fab-ring-color);
-            border-opacity: 0.5;
-        }
+    
         #floatingButton:hover {
-            background-color: var(--fab-hover-color);
+            background-color: rgba(100, 149, 237, 0.3);
             transform: scale(1.05);
         }
     </style>
@@ -180,7 +179,7 @@
 
         /* Styling for sticky right total display components */
         .total-cell-tm, .total-cell-gm, .total-cell-combined {
-            padding: 4px 8px;
+            padding: 2px 4px;
             font-size: 0.8rem;
             line-height: 1.2;
             text-align: right;
@@ -262,14 +261,8 @@
 
 <!-- Floating Button -->
     <button id="floatingButton"
-            class="fixed 
-                   bottom-4 right-1 
-                   p-3 text-l    
-                   bg-green-600 hover:bg-green-700 ring-4 ring-green-300 ring-opacity-50
-                   text-white font-bold 
-                   rounded-full shadow-2xl 
-                   flex items-center space-x-2">
-        <i class="fas fa-calculator"></i>
+        class="fixed bottom-10 right-4 px-3 py-2 font-semibold flex items-center space-x-2 shadow-2xl">
+        <i class="fas fa-calculator text-lg"></i>
         <span class="hidden md:inline">Meal Calculator</span>
     </button>
     <script>
@@ -726,7 +719,7 @@
 
     </script>
     <script src="https://cdn.jsdelivr.net/gh/mealcalapp/for-all/flip.js"></script>
-
+    <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
     <div style="text-align:center; margin-top:20px; font-size:13px; color:#555;">
     <span style="font-size:18px; vertical-align:middle;">&copy;</span>
     <a href="https://saniatkajoljisan.github.io/skjisan/" target="_blank" style="color:#3182ce; font-weight:bold; text-decoration:none; margin:0 1px; vertical-align:middle;">SK JISAN</a>
