@@ -3,7 +3,7 @@
 /********** Theme: dark **********/
 /* Font styles */
 .rotor-bottom, .rotor, .rotor-leaf-front, .rotor-leaf-rear, .rotor-top {
-      background-color: #699ef5 !important;
+      background: linear-gradient(135deg, #0f172a 0%, #1d4ed8 45%, #06b6d4 100%) !important;
     }
 
     .countdown, .countdown-circles {
