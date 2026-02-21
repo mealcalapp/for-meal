@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11,21 +12,18 @@
     <style>
         #floatingButton {
             z-index: 100;
-            backdrop-filter: blur(2px) saturate(180%);
-            -webkit-backdrop-filter: blur(20px) saturate(180%);
-            background-color: rgba(100, 149, 237, 0.2); 
-            border: 1px solid rgba(100, 149, 237, 0.1);
             border-radius: 9999px;
-            color: white;
-            box-shadow: 
-                0 8px 20px rgba(0, 0, 0, 0.3),
-                inset 0 1px 1px rgba(255, 255, 255, 0.3);
-            transition: all 0.3s ease-in-out;
+            color: #ffffff;
+            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 45%, #06b6d4 100%);
+            border: 1px solid rgba(255, 255, 255, 0.35);
+            box-shadow: 0 14px 28px rgba(30, 58, 138, 0.35), 0 8px 16px rgba(2, 6, 23, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+            transition: transform 0.25s ease, box-shadow 0.25s ease, filter 0.25s ease;
         }
-    
+
         #floatingButton:hover {
-            background-color: rgba(100, 149, 237, 0.3);
-            transform: scale(1.05);
+            transform: translateY(-2px) scale(1.03);
+            filter: saturate(1.15);
+            box-shadow: 0 18px 30px rgba(30, 58, 138, 0.4), 0 10px 20px rgba(2, 6, 23, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.35);
         }
     </style>
     <!-- Custom configuration for Tailwind -->
@@ -67,7 +65,7 @@
             position: sticky;
             top: 0;
             z-index: 10;
-            background-color: #F9FAFB; /* Light header background */
+            background-color: #DDE6EF; /* Match name header background */
         }
 
         /* Sticky first column (Serial and Name) */
@@ -133,6 +131,12 @@
             overflow: hidden;
             text-overflow: ellipsis;
         }
+        .serial-cell {
+            min-width: 44px;
+            max-width: 44px;
+            width: 44px;
+            text-align: center;
+        }
         
         /* Specific styling for the editable name input */
         .name-input {
@@ -169,7 +173,7 @@
 
         /* Styling for the Guest Meal row */
         .guest-row td {
-            background-color: #EBF1F7 /* Light pink background */
+            background-color: #EBF1F7; /* Guest row background */
         }
 
         /* Add a visible space between person groups */
@@ -212,6 +216,23 @@
         -webkit-appearance: none;
         margin: 0;
         }
+
+        .locked-input {
+            cursor: not-allowed;
+            background-color: #f8fafc !important;
+            color: #64748b !important;
+        }
+
+        .admin-badge {
+            display: inline-block;
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: #ffffff;
+            background-color: #0f766e;
+            border-radius: 9999px;
+            padding: 4px 10px;
+            margin-left: 8px;
+        }
     </style>
 </head>
 <body class="p-4 md:p-8">
@@ -223,27 +244,45 @@
         </h1>
         <p class="text-sm text-gray-500 mt-1">Real-time monthly Meal Register</p>
         
-        <!-- NEW INPUT FOR DYNAMIC MEMBER COUNT -->
-        <div class="mt-4 flex justify-center items-center">
-        <label for="total-members-input" class="text-sm font-medium text-gray-700 mr-3">Total Members:</label>
-        <input 
-            type="number"
-            id="total-members-input"
-            class="w-20 p-2 border border-gray-300 rounded-lg text-center focus:ring-primary-blue focus:border-primary-blue"
-            min="1"
-            max="999"
-            value="20"
-            onchange="handleTotalMembersChange(event)"
-        >
+        <div class="mt-4 flex flex-wrap justify-center items-center gap-3">
+            <label for="total-members-input" class="text-sm font-medium text-gray-700">Total Members:</label>
+            <input 
+                type="number"
+                id="total-members-input"
+                class="w-20 p-2 border border-gray-300 rounded-lg text-center focus:ring-primary-blue focus:border-primary-blue"
+                min="1"
+                max="999"
+                value="20"
+            >
+            <label for="month-selector" class="text-sm font-medium text-gray-700">Previous History:</label>
+            <select id="month-selector" class="p-2 border border-gray-300 rounded-lg focus:ring-primary-blue focus:border-primary-blue"></select>
+            <label for="fixed-meal-input" class="text-sm font-medium text-gray-700">Fixed Meal:</label>
+            <input
+                type="number"
+                id="fixed-meal-input"
+                class="w-24 p-2 border border-gray-300 rounded-lg text-center focus:ring-primary-blue focus:border-primary-blue"
+                min="0"
+                value="60"
+            >
+            <button id="fixed-meal-save-btn" class="px-3 py-2 text-sm font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700">Set</button>
+        </div>
+
+        <div class="mt-4 flex flex-wrap justify-center items-center gap-2">
+            <button id="admin-login-btn" class="px-3 py-2 text-sm font-semibold text-white bg-slate-700 rounded-lg hover:bg-slate-800">Manager Login</button>
+            <button id="admin-logout-btn" class="px-3 py-2 text-sm font-semibold text-white bg-rose-600 rounded-lg hover:bg-rose-700 hidden">Manager Logout</button>
+            <span id="admin-mode-indicator" class="text-sm text-slate-500">User Mode</span>
+        </div>
+        <div id="admin-login-panel" class="mt-3 flex flex-wrap justify-center items-center gap-2 hidden">
+            <input type="password" id="admin-password" class="w-40 p-2 border border-gray-300 rounded-lg text-sm" placeholder="Manager password">
+            <button id="admin-submit-btn" class="px-3 py-2 text-sm font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700">Login</button>
         </div>
     </header>
     
-    <!-- Message Box for Feedback (NEW LOCATION: Above the table) -->
-    <!-- <div id="message-box-container" class="relative w-full mb-4">
+    <div id="message-box-container" class="relative w-full mb-4">
         <div id="message-box" class="mx-auto w-full md:w-1/2 bg-green-500 text-white p-3 rounded-lg shadow-xl text-center hidden transition-all duration-300 transform opacity-0">
             Saved!
         </div>
-    </div> -->
+    </div>
 
 
     <!-- Table Container -->
@@ -265,458 +304,660 @@
         <i class="fas fa-calculator text-lg"></i>
         <span class="hidden md:inline">Meal Calculator</span>
     </button>
+    <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
     <script>
-        document.addEventListener("DOMContentLoaded", () => {
-          const marquee = document.getElementById("monthMarquee");
-          const now = new Date();
-          const monthYear = now.toLocaleString('default', { month: 'long', year: 'numeric' });
-          const customText = "Time Left";
-          marquee.textContent = `${monthYear} — ${customText}`;
-        });
-    </script>
+        // Replace this with your own Firebase project config.
+        // You can also set `window.FIREBASE_CONFIG = {...}` before this script.
+        const FIREBASE_CONFIG = window.FIREBASE_CONFIG || {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_PROJECT.firebaseapp.com",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_PROJECT.appspot.com",
+            messagingSenderId: "YOUR_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
 
-    <script>
-        // --- Configuration and Initialization ---
-        // Removed hardcoded NUM_PEOPLE. Now uses global variable numPeople.
-        const KEY_DATA = 'mealRegisterData';
-        const KEY_MONTH = 'mealRegisterMonth';
-        const KEY_MEMBER_COUNT = 'mealRegisterMemberCount'; // New key for dynamic count
-        
-        let numPeople = 20; // Default startup value
-        
-        const table = document.getElementById('meal-register-table');
-        const monthHeader = document.getElementById('month-header');
-        const messageBox = document.getElementById('message-box');
+        const ADMIN_PASSWORD = "sk77";
+        const COLLECTION_NAME = "mealRegisters";
+        const LOCAL_FALLBACK_KEY = "mealRegistersLocalFallback";
+        const MAX_DAYS = 31;
 
-        // Global data store. Structure: Array of N objects.
+        const table = document.getElementById("meal-register-table");
+        const monthHeader = document.getElementById("month-header");
+        const messageBox = document.getElementById("message-box");
+        const monthSelector = document.getElementById("month-selector");
+        const membersInput = document.getElementById("total-members-input");
+        const marquee = document.getElementById("monthMarquee");
+        const adminLoginBtn = document.getElementById("admin-login-btn");
+        const adminLogoutBtn = document.getElementById("admin-logout-btn");
+        const adminModeIndicator = document.getElementById("admin-mode-indicator");
+        const adminLoginPanel = document.getElementById("admin-login-panel");
+        const adminPasswordInput = document.getElementById("admin-password");
+        const adminSubmitBtn = document.getElementById("admin-submit-btn");
+        const fixedMealInput = document.getElementById("fixed-meal-input");
+        const fixedMealSaveBtn = document.getElementById("fixed-meal-save-btn");
+
+        let db = null;
+        let monthDocRef = null;
+        let unsubscribeMonth = null;
+        let isFirebaseMode = false;
+
+        let numPeople = 20;
+        let fixedMeal = 60;
         let mealData = [];
+        let isAdminMode = false;
+        let selectedMonthDate = monthStart(new Date());
+        let selectedMonthDays = getDaysInMonth(selectedMonthDate);
 
-        /**
-         * Converts raw input value (string) to a number, defaulting to 0 for invalid inputs.
-         * @param {string} value - The input value string.
-         * @returns {number} The parsed number.
-         */
+        function monthStart(date) {
+            return new Date(date.getFullYear(), date.getMonth(), 1);
+        }
+
+        function addMonths(date, months) {
+            return new Date(date.getFullYear(), date.getMonth() + months, 1);
+        }
+
+        function getMonthKey(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, "0");
+            return `${year}-${month}`;
+        }
+
+        function parseMonthKey(key) {
+            const [year, month] = key.split("-").map(Number);
+            return new Date(year, month - 1, 1);
+        }
+
+        function getMonthLabel(date) {
+            return date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+        }
+
+        function getDaysInMonth(date) {
+            return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+        }
+
         function parseInput(value) {
             const num = parseFloat(value);
-            return isNaN(num) || num < 0 ? 0 : num;
+            return Number.isFinite(num) && num >= 0 ? num : 0;
         }
-        
-        /**
-         * Formats a number to one decimal place, removing trailing .0 if it's a whole number.
-         * @param {number} num - The number to format.
-         * @returns {string} The formatted number string.
-         */
+
         function formatNumber(num) {
-            // Check if the number is an integer (no fractional part)
-            if (num % 1 === 0) {
-                return num.toString();
-            }
-            // Otherwise, return it fixed to one decimal place
-            return num.toFixed(1);
+            return Number.isInteger(num) ? String(num) : num.toFixed(1);
         }
 
-        // --- Core Data Management and Persistence ---
-
-        /**
-         * Resizes the mealData array to the new total size (newSize).
-         * Fills new entries with defaults or truncates if the new size is smaller.
-         * @param {number} newSize - The desired number of members.
-         */
-        function resizeMealData(newSize) {
-            const currentSize = mealData.length;
-
-            if (newSize > currentSize) {
-                // Add new members
-                for (let i = currentSize; i < newSize; i++) {
-                    mealData.push({
-                        name: `Member ${i + 1}`,
-                        meals: Array(31).fill(0),
-                        guestMeals: Array(31).fill(0)
-                    });
-                }
-            } else if (newSize < currentSize) {
-                // Truncate members
-                mealData = mealData.slice(0, newSize);
-            }
-            numPeople = newSize; // Update the global variable
-            saveData(false); // Save the resized structure without feedback
+        function isCurrentMonthView() {
+            return getMonthKey(selectedMonthDate) === getMonthKey(monthStart(new Date()));
         }
 
-        /**
-         * Creates a fresh data model based on the current numPeople.
-         */
-        function initializeNewData() {
-            mealData = Array.from({ length: numPeople }, (_, i) => ({
-                name: `Member ${i + 1}`, // Default name stored (used as placeholder if empty)
-                meals: Array(31).fill(0),
-                guestMeals: Array(31).fill(0)
-            }));
-            saveData(false); // Save the initial empty structure
+        function isReadOnlyForUser() {
+            return !isAdminMode && !isCurrentMonthView();
         }
 
-        /**
-         * Initializes the meal data, checking for a monthly reset condition.
-         * It loads data from localStorage or creates a new structure.
-         */
-        function initializeData() {
-            const currentDate = new Date();
-            const currentMonthYear = `${currentDate.getMonth() + 1}-${currentDate.getFullYear()}`;
-            const storedMonthYear = localStorage.getItem(KEY_MONTH);
-
-            // Set the header text
-            const monthNames = ["January", "February", "March", "April", "May", "June",
-                "July", "August", "September", "October", "November", "December"
-            ];
-            monthHeader.textContent = `${monthNames[currentDate.getMonth()]} ${currentDate.getFullYear()}`;
-
-            // 1. Monthly Reset Check: If the stored month is different, clear all data.
-            if (storedMonthYear && storedMonthYear !== currentMonthYear) {
-                console.log(`New month detected: ${currentMonthYear}. Resetting data from ${storedMonthYear}.`);
-                localStorage.removeItem(KEY_DATA);
-                localStorage.setItem(KEY_MONTH, currentMonthYear); // Set the new month
-                // window.location.reload(); // Required behavior, but kept commented for testing environments
-            } else if (!storedMonthYear) {
-                // First time setup
-                localStorage.setItem(KEY_MONTH, currentMonthYear);
-            }
-
-            // 2. Load or Initialize Member Count
-            const storedMemberCount = localStorage.getItem(KEY_MEMBER_COUNT);
-            if (storedMemberCount && parseInt(storedMemberCount) > 0) {
-                numPeople = parseInt(storedMemberCount);
-                // Update the input field with the stored value
-                const input = document.getElementById('total-members-input');
-                if (input) {
-                    input.value = numPeople;
-                }
-            } else {
-                localStorage.setItem(KEY_MEMBER_COUNT, numPeople); // Save default 20
-            }
-
-
-            // 3. Load or Initialize Meal Data
-            const storedData = localStorage.getItem(KEY_DATA);
-            if (storedData) {
-                // Load data from localStorage
-                try {
-                    mealData = JSON.parse(storedData);
-                    // Handle resizing of mealData based on stored count vs actual data length
-                    if (mealData.length !== numPeople) {
-                        console.log(`Resizing meal data from ${mealData.length} to ${numPeople}.`);
-                        resizeMealData(numPeople);
-                    }
-                    console.log("Data loaded from localStorage.");
-                } catch (e) {
-                    console.error("Error loading stored data, initializing new data.", e);
-                    initializeNewData();
-                }
-            } else {
-                // Initialize new, empty data structure
-                initializeNewData();
-            }
+        function getDefaultMember(index) {
+            return {
+                name: `Member ${index + 1}`,
+                nameLocked: false,
+                meals: Array(MAX_DAYS).fill(0),
+                guestMeals: Array(MAX_DAYS).fill(0),
+                mealLocked: Array(MAX_DAYS).fill(false),
+                guestMealLocked: Array(MAX_DAYS).fill(false)
+            };
         }
 
-        /**
-         * Saves the current mealData array to localStorage.
-         * @param {boolean} [showFeedback=true] - Whether to display the save message.
-         */
-        function saveData(showFeedback = true) {
-            try {
-                localStorage.setItem(KEY_DATA, JSON.stringify(mealData));
-                if (showFeedback) showSaveMessage();
-            } catch (e) {
-                console.error("Could not save data to localStorage.", e);
-            }
+        function normalizeArray(raw, length, defaultValue) {
+            const source = Array.isArray(raw) ? raw : [];
+            const out = source.slice(0, length);
+            while (out.length < length) out.push(defaultValue);
+            return out;
         }
 
-        /**
-         * Shows a transient success message in the new central location.
-         */
-        function showSaveMessage() {
-            messageBox.classList.remove('hidden', 'bg-red-500', 'opacity-0');
-            messageBox.classList.add('bg-green-500', 'opacity-100');
-            messageBox.textContent = "Saved!"; 
-            
+        function normalizeMember(member, index) {
+            const base = getDefaultMember(index);
+            const safe = member && typeof member === "object" ? member : {};
+            const name = typeof safe.name === "string" && safe.name.trim() ? safe.name.trim() : base.name;
+            return {
+                name,
+                nameLocked: Boolean(safe.nameLocked),
+                meals: normalizeArray(safe.meals, MAX_DAYS, 0).map(parseInput),
+                guestMeals: normalizeArray(safe.guestMeals, MAX_DAYS, 0).map(parseInput),
+                mealLocked: normalizeArray(safe.mealLocked, MAX_DAYS, false).map(Boolean),
+                guestMealLocked: normalizeArray(safe.guestMealLocked, MAX_DAYS, false).map(Boolean)
+            };
+        }
+
+        function normalizeMembers(members, count) {
+            const source = Array.isArray(members) ? members : [];
+            const out = [];
+            for (let i = 0; i < count; i += 1) {
+                out.push(normalizeMember(source[i], i));
+            }
+            return out;
+        }
+
+        function updateHeaderAndNotice() {
+            // Header/notice should always show running month name, even when viewing history data.
+            const label = getMonthLabel(monthStart(new Date()));
+            monthHeader.textContent = label;
+            if (marquee) marquee.textContent = `${label} - Time Left`;
+        }
+
+        function showMessage(text, isError = false) {
+            if (!messageBox) return;
+            messageBox.classList.remove("hidden", "bg-green-500", "bg-red-500", "opacity-0");
+            messageBox.classList.add(isError ? "bg-red-500" : "bg-green-500", "opacity-100");
+            messageBox.textContent = text;
+
             clearTimeout(messageBox.timeoutId);
             messageBox.timeoutId = setTimeout(() => {
-                messageBox.classList.remove('opacity-100');
-                messageBox.classList.add('opacity-0');
-                // Hide fully after transition
-                setTimeout(() => {
-                    messageBox.classList.add('hidden');
-                }, 300); // Wait for the transition duration
-            }, 1500);
+                messageBox.classList.remove("opacity-100");
+                messageBox.classList.add("opacity-0");
+                setTimeout(() => messageBox.classList.add("hidden"), 300);
+            }, 1800);
         }
 
-        // --- Table Rendering ---
-        
-        /**
-         * Main function to render/re-render the entire table.
-         */
+        function updateAdminUI() {
+            if (isAdminMode) {
+                adminModeIndicator.innerHTML = 'Manager Mode <span class="admin-badge"></span>';
+                adminLoginBtn.classList.add("hidden");
+                adminLogoutBtn.classList.remove("hidden");
+                adminLoginPanel.classList.add("hidden");
+                fixedMealSaveBtn.classList.remove("hidden");
+            } else {
+                adminModeIndicator.textContent = "User Mode";
+                adminLoginBtn.classList.remove("hidden");
+                adminLogoutBtn.classList.add("hidden");
+                fixedMealSaveBtn.classList.add("hidden");
+            }
+            fixedMealInput.disabled = !isAdminMode;
+            fixedMealSaveBtn.disabled = !isAdminMode;
+            renderTable();
+        }
+
+        function readLocalStore() {
+            try {
+                const raw = localStorage.getItem(LOCAL_FALLBACK_KEY);
+                const parsed = raw ? JSON.parse(raw) : {};
+                return parsed && typeof parsed === "object" ? parsed : {};
+            } catch (error) {
+                console.error(error);
+                return {};
+            }
+        }
+
+        function writeLocalStore(store) {
+            localStorage.setItem(LOCAL_FALLBACK_KEY, JSON.stringify(store));
+        }
+
+        function initFirebase() {
+            if (!FIREBASE_CONFIG || FIREBASE_CONFIG.apiKey === "YOUR_API_KEY") {
+                isFirebaseMode = false;
+                return false;
+            }
+
+            if (!firebase.apps.length) {
+                firebase.initializeApp(FIREBASE_CONFIG);
+            }
+            db = firebase.firestore();
+            isFirebaseMode = true;
+            return true;
+        }
+
+        async function cleanupOldMonths() {
+            const currentMonth = monthStart(new Date());
+            const previousMonth = addMonths(currentMonth, -1);
+            const thresholdKey = getMonthKey(previousMonth);
+            if (!db) {
+                const store = readLocalStore();
+                Object.keys(store).forEach((key) => {
+                    if (key < thresholdKey) delete store[key];
+                });
+                writeLocalStore(store);
+                return;
+            }
+
+            const docId = firebase.firestore.FieldPath.documentId();
+            const snapshot = await db.collection(COLLECTION_NAME).orderBy(docId).endBefore(thresholdKey).get();
+            const deletes = snapshot.docs.map((doc) => doc.ref.delete());
+            await Promise.all(deletes);
+        }
+
+        async function loadMonthOptions() {
+            const currentMonth = monthStart(new Date());
+            const previousMonth = addMonths(currentMonth, -1);
+            const keyToDate = new Map([
+                [getMonthKey(currentMonth), currentMonth],
+                [getMonthKey(previousMonth), previousMonth]
+            ]);
+
+            if (!db) {
+                const store = readLocalStore();
+                Object.keys(store).forEach((key) => {
+                    const maybeDate = parseMonthKey(key);
+                    if (!Number.isNaN(maybeDate.getTime())) keyToDate.set(key, maybeDate);
+                });
+            } else {
+                const docId = firebase.firestore.FieldPath.documentId();
+                const snapshot = await db.collection(COLLECTION_NAME).orderBy(docId, "desc").limit(6).get();
+                snapshot.docs.forEach((doc) => {
+                    const maybeDate = parseMonthKey(doc.id);
+                    if (!Number.isNaN(maybeDate.getTime())) keyToDate.set(doc.id, maybeDate);
+                });
+            }
+
+            const sortedKeys = Array.from(keyToDate.keys()).sort((a, b) => (a < b ? 1 : -1));
+            monthSelector.innerHTML = "";
+            sortedKeys.forEach((key) => {
+                const option = document.createElement("option");
+                option.value = key;
+                option.textContent = getMonthLabel(keyToDate.get(key));
+                monthSelector.appendChild(option);
+            });
+
+            const currentKey = getMonthKey(selectedMonthDate);
+            monthSelector.value = keyToDate.has(currentKey) ? currentKey : sortedKeys[0];
+            selectedMonthDate = parseMonthKey(monthSelector.value);
+            selectedMonthDays = getDaysInMonth(selectedMonthDate);
+            updateHeaderAndNotice();
+        }
+
+        function buildPayload() {
+            return {
+                monthKey: getMonthKey(selectedMonthDate),
+                monthLabel: getMonthLabel(selectedMonthDate),
+                memberCount: numPeople,
+                fixedMeal,
+                members: mealData,
+                updatedAt: db ? firebase.firestore.FieldValue.serverTimestamp() : Date.now()
+            };
+        }
+
+        async function saveMonthData(showFeedback = true) {
+            if (!db) {
+                const key = getMonthKey(selectedMonthDate);
+                const store = readLocalStore();
+                store[key] = buildPayload();
+                writeLocalStore(store);
+                if (showFeedback) showMessage("Saved (Local Mode)");
+                return;
+            }
+            if (!monthDocRef) return;
+            await monthDocRef.set(buildPayload(), { merge: true });
+            if (showFeedback) showMessage("Saved");
+        }
+
+        async function openMonth(date) {
+            selectedMonthDate = monthStart(date);
+            selectedMonthDays = getDaysInMonth(selectedMonthDate);
+            updateHeaderAndNotice();
+
+            const monthKey = getMonthKey(selectedMonthDate);
+            if (!db) {
+                const store = readLocalStore();
+                const data = store[monthKey];
+                if (!data) {
+                    numPeople = 20;
+                    fixedMeal = 60;
+                    mealData = Array.from({ length: numPeople }, (_, index) => getDefaultMember(index));
+                    membersInput.value = String(numPeople);
+                    fixedMealInput.value = String(fixedMeal);
+                    renderTable();
+                    await saveMonthData(false);
+                    return;
+                }
+                const incomingCount = Number.isInteger(data.memberCount) && data.memberCount > 0 ? data.memberCount : 20;
+                const incomingFixed = Number.isFinite(Number(data.fixedMeal)) ? parseInput(data.fixedMeal) : 60;
+                numPeople = incomingCount;
+                fixedMeal = incomingFixed;
+                mealData = normalizeMembers(data.members, incomingCount);
+                membersInput.value = String(numPeople);
+                fixedMealInput.value = String(fixedMeal);
+                renderTable();
+                return;
+            }
+
+            monthDocRef = db.collection(COLLECTION_NAME).doc(monthKey);
+
+            if (unsubscribeMonth) unsubscribeMonth();
+            unsubscribeMonth = monthDocRef.onSnapshot(async (snapshot) => {
+                if (!snapshot.exists) {
+                    numPeople = 20;
+                    fixedMeal = 60;
+                    mealData = Array.from({ length: numPeople }, (_, index) => getDefaultMember(index));
+                    membersInput.value = String(numPeople);
+                    fixedMealInput.value = String(fixedMeal);
+                    renderTable();
+                    await saveMonthData(false);
+                    return;
+                }
+
+                const data = snapshot.data() || {};
+                const incomingCount = Number.isInteger(data.memberCount) && data.memberCount > 0 ? data.memberCount : 20;
+                const incomingFixed = Number.isFinite(Number(data.fixedMeal)) ? parseInput(data.fixedMeal) : 60;
+                numPeople = incomingCount;
+                fixedMeal = incomingFixed;
+                mealData = normalizeMembers(data.members, incomingCount);
+                membersInput.value = String(numPeople);
+                fixedMealInput.value = String(fixedMeal);
+                renderTable();
+            }, (error) => {
+                console.error(error);
+                showMessage("Realtime sync error", true);
+            });
+        }
+
         function renderTable() {
-            // Clear existing table content safely before re-rendering
-            table.innerHTML = ''; 
-            
+            membersInput.disabled = isReadOnlyForUser();
+            fixedMealInput.value = String(formatNumber(fixedMeal));
+            table.innerHTML = "";
             renderTableHeader();
             renderTableBody();
         }
 
-        /**
-         * Dynamically generates the table header (Serial, Name, Days 1-31, Total Meal).
-         */
         function renderTableHeader() {
             const head = table.createTHead();
             const row = head.insertRow();
+            row.insertCell().outerHTML = '<th class="sticky-col-left sticky-header text-center" style="min-width: 44px; width: 44px;">S/N</th>';
+            row.insertCell().outerHTML = '<th class="sticky-col-left sticky-header name-cell text-center" style="min-width: 135px; padding: 8px 12px;">Name</th>';
 
-            // Corner cell
-            row.insertCell().outerHTML = `<th class="sticky-col-left sticky-header text-center" style="min-width: 50px;">S/N</th>`;
-            // Name cell
-            row.insertCell().outerHTML = `<th class="sticky-col-left sticky-header name-cell text-center" style="min-width: 150px; padding: 8px 12px;">Name</th>`;
-
-            // Day numbers (1 to 31)
-            for (let day = 1; day <= 31; day++) {
+            for (let day = 1; day <= selectedMonthDays; day += 1) {
                 row.insertCell().outerHTML = `<th class="sticky-header text-center p-2">${day}</th>`;
             }
 
-            // Total Meal cell (sticky right)
-            row.insertCell().outerHTML = `
-                <th class="sticky-col-right sticky-header text-center p-2" style="min-width: 120px;">
-                    Total Meal: <span id="grand-total" class="font-bold text-primary-blue">0</span>
-                </th>`;
+            row.insertCell().outerHTML = '<th class="sticky-col-right sticky-header text-center p-2">T M: <span id="grand-total" class="font-bold text-primary-blue">0</span></th>';
         }
 
-        /**
-         * Dynamically generates the table body with 2 rows for each person.
-         */
+        function createMealInput(personIndex, dayIndex, type, value, locked) {
+            const input = document.createElement("input");
+            input.type = "number";
+            input.min = "0";
+            input.step = "0.5";
+            input.className = `meal-input ${type === "meal" ? "text-gray-800" : "text-pink-700"}`;
+            input.dataset.person = String(personIndex);
+            input.dataset.day = String(dayIndex);
+            input.dataset.type = type;
+            input.value = value === 0 ? "" : formatNumber(value);
+            input.disabled = locked || isReadOnlyForUser();
+            if (input.disabled) input.classList.add("locked-input");
+            input.addEventListener("change", handleMealInputChange);
+            return input;
+        }
+
         function renderTableBody() {
             const body = table.createTBody();
-
             mealData.forEach((person, personIndex) => {
                 const defaultName = `Member ${personIndex + 1}`;
-                // If the stored name is the default name, we leave the input value empty so the placeholder shows.
-                const displayName = person.name.startsWith('Member ') ? '' : person.name;
 
-                // --- 1. Main Meal Row ---
                 const mealRow = body.insertRow();
-                mealRow.id = `person-${personIndex}-meal-row`;
-                // Use numPeople to check the last row for border separation
-                if (personIndex < numPeople - 1) {
-                    mealRow.classList.add('border-b-0'); 
-                }
+                if (personIndex < numPeople - 1) mealRow.classList.add("border-b-0");
 
-                // Serial Number
-                let serialCell = mealRow.insertCell();
-                serialCell.classList.add('sticky-col-left', 'serial-cell', 'text-center', 'font-medium', 'p-3');
-                serialCell.rowSpan = 2; // Spans both Meal and Guest Meal row
-                serialCell.textContent = personIndex + 1;
+                const serialCell = mealRow.insertCell();
+                serialCell.classList.add("sticky-col-left", "serial-cell", "text-center", "font-medium", "p-3");
+                serialCell.rowSpan = 2;
+                serialCell.textContent = String(personIndex + 1);
 
-                // Name (Editable Input) - NO INLINE TOTAL DISPLAY
-                let nameCell = mealRow.insertCell();
-                nameCell.classList.add('sticky-col-left', 'name-cell', 'text-left');
-                nameCell.innerHTML = `
-                    <div class="flex flex-col h-full w-full justify-center">
-                        <input
-                            type="text"
-                            class="name-input"
-                            placeholder="${defaultName}"
-                            value="${displayName}"
-                            data-person="${personIndex}"
-                            oninput="handleNameInput(event)"
-                        >
-                    </div>
-                `;
+                const nameCell = mealRow.insertCell();
+                nameCell.classList.add("sticky-col-left", "name-cell", "text-left");
+                const nameWrap = document.createElement("div");
+                nameWrap.className = "flex flex-col h-full w-full justify-center";
+                const nameInput = document.createElement("input");
+                nameInput.type = "text";
+                nameInput.className = "name-input";
+                nameInput.placeholder = defaultName;
+                nameInput.value = person.name.startsWith("Member ") ? "" : person.name;
+                nameInput.dataset.person = String(personIndex);
+                nameInput.disabled = (person.nameLocked && !isAdminMode) || isReadOnlyForUser();
+                if (nameInput.disabled) nameInput.classList.add("locked-input");
+                nameInput.addEventListener("change", handleNameInputChange);
+                nameWrap.appendChild(nameInput);
+                nameCell.appendChild(nameWrap);
 
-                // Day Inputs (Meals)
-                for (let day = 0; day < 31; day++) {
+                for (let day = 0; day < selectedMonthDays; day += 1) {
                     const cell = mealRow.insertCell();
-                    cell.innerHTML = `<input
-                        type="number"
-                        min="0"
-                        class="meal-input text-gray-800"
-                        data-person="${personIndex}"
-                        data-type="meal"
-                        data-day="${day}"
-                        value="${person.meals[day] === 0 ? '' : person.meals[day]}"
-                        oninput="handleInput(event)"
-                    >`;
+                    const locked = person.mealLocked[day] && !isAdminMode;
+                    cell.appendChild(createMealInput(personIndex, day, "meal", person.meals[day], locked));
                 }
 
-                // Total Meal Display (TM: [Total], GM: [Total], Total: [Combined]) - Sticky Right
-                let totalCell = mealRow.insertCell();
-                totalCell.classList.add('sticky-col-right', 'text-sm', 'text-gray-800');
+                const totalCell = mealRow.insertCell();
+                totalCell.classList.add("sticky-col-right", "text-sm", "text-gray-800");
                 totalCell.rowSpan = 2;
                 totalCell.id = `total-display-${personIndex}`;
-                // Initial update will fill content
 
-                // --- 2. Guest Meal Row ---
                 const guestRow = body.insertRow();
-                guestRow.id = `person-${personIndex}-guest-row`;
-                guestRow.classList.add('guest-row', 'text-xs', 'text-gray-500');
-                // Use numPeople to check the last row for border separation
-                if (personIndex < numPeople - 1) {
-                    guestRow.classList.add('person-group-end'); // Strong border below guest row
-                }
+                guestRow.classList.add("guest-row", "text-xs", "text-gray-500");
+                if (personIndex < numPeople - 1) guestRow.classList.add("person-group-end");
 
-                // Guest Meal Label (takes the place of the Name cell)
-                let guestLabelCell = guestRow.insertCell();
-                guestLabelCell.classList.add('sticky-col-left', 'name-cell', 'text-left', 'italic', 'p-3');
-                guestLabelCell.textContent = 'Guest Meal';
+                const guestLabelCell = guestRow.insertCell();
+                guestLabelCell.classList.add("sticky-col-left", "name-cell", "text-left", "italic", "p-3");
+                guestLabelCell.textContent = "Guest Meal";
 
-                // Day Inputs (Guest Meals)
-                for (let day = 0; day < 31; day++) {
+                for (let day = 0; day < selectedMonthDays; day += 1) {
                     const cell = guestRow.insertCell();
-                    cell.innerHTML = `<input
-                        type="number"
-                        min="0"
-                        class="meal-input text-pink-700"
-                        data-person="${personIndex}"
-                        data-type="guest"
-                        data-day="${day}"
-                        value="${person.guestMeals[day] === 0 ? '' : person.guestMeals[day]}"
-                        oninput="handleInput(event)"
-                    >`;
+                    const locked = person.guestMealLocked[day] && !isAdminMode;
+                    cell.appendChild(createMealInput(personIndex, day, "guest", person.guestMeals[day], locked));
                 }
             });
-            // Calculate all totals on initial load
+
             mealData.forEach((_, index) => updateTotal(index));
             updateGrandTotal();
         }
 
-        // --- Real-time Calculation and Event Handling ---
-
-        /**
-         * Handles input change for the Total Members field.
-         * @param {Event} event - The input event object.
-         */
-        function handleTotalMembersChange(event) {
-            let newCount = parseInt(event.target.value);
-            
-            // Validate input to be at least 1
-            if (isNaN(newCount) || newCount < 1) {
-                newCount = 1; 
-                event.target.value = newCount;
-            }
-
-            // Only update and re-render if the count actually changed
-            if (newCount !== numPeople) {
-                localStorage.setItem(KEY_MEMBER_COUNT, newCount);
-                resizeMealData(newCount);
-                renderTable(); // Re-render the whole table
-                showSaveMessage();
-            }
-        }
-        
-        /**
-         * Handles input changes in the Name field, updates data model, and saves data.
-         * @param {Event} event - The input event object.
-         */
-        function handleNameInput(event) {
-            const input = event.target;
-            const personIndex = parseInt(input.dataset.person);
-            const value = input.value.trim();
-            const defaultName = `Member ${personIndex + 1}`;
-
-            // 1. Update the data model (mealData array)
-            mealData[personIndex].name = value === '' ? defaultName : value;
-
-            // 2. Save the entire data structure to localStorage
-            saveData(true);
+        function sumByDays(arr) {
+            return arr.slice(0, selectedMonthDays).reduce((sum, value) => sum + parseInput(value), 0);
         }
 
-        /**
-         * Calculates and updates the Total Meal (TM), Guest Meal (GM), and Combined Total displays for one person 
-         * only in the sticky right column.
-         * @param {number} personIndex - The index of the person in the mealData array.
-         */
+        function getBillingTotal(person) {
+            const realMeal = sumByDays(person.meals);
+            const guestMeal = sumByDays(person.guestMeals);
+            const baseMeal = realMeal < fixedMeal ? fixedMeal : realMeal;
+            return baseMeal + guestMeal;
+        }
+
         function updateTotal(personIndex) {
             const person = mealData[personIndex];
+            const totalMeal = sumByDays(person.meals);
+            const totalGuestMeal = sumByDays(person.guestMeals);
+            const totalCombined = getBillingTotal(person);
 
-            // Calculate totals
-            const totalMeal = person.meals.reduce((sum, value) => sum + parseInput(value), 0);
-            const totalGuestMeal = person.guestMeals.reduce((sum, value) => sum + parseInput(value), 0);
-            const totalCombined = totalMeal + totalGuestMeal; // Combined Total
-
-            // 1. Update the sticky right total cell (TM/GM/Total)
             const rightDisplayCell = document.getElementById(`total-display-${personIndex}`);
             if (rightDisplayCell) {
-                // Renders TM, GM, and Total regardless of zero value, as it is the primary total column
                 rightDisplayCell.innerHTML = `
                     <div class="p-2">
-                        <div class="total-cell-tm flex justify-between"><span>Meal:</span><span>${formatNumber(totalMeal)}</span></div>
+                        <div class="total-cell-tm flex justify-between"><span>Real:</span><span>${formatNumber(totalMeal)}</span></div>
                         <div class="total-cell-gm flex justify-between"><span>Guest:</span><span>${formatNumber(totalGuestMeal)}</span></div>
-                        <!-- Combined Total -->
                         <div class="total-cell-combined flex justify-between"><span>Total:</span><span>${formatNumber(totalCombined)}</span></div>
                     </div>
                 `;
             }
-            updateGrandTotal(); // Update overall total after each person total recalculation
+            updateGrandTotal();
         }
 
-        /**
-         * Updates the grand total (sum of all Total Meals + Guest Meals)
-         * and displays it in the header.
-         */
         function updateGrandTotal() {
-            const total = mealData.reduce((sum, person) => {
-                const personTotal = person.meals.reduce((a, b) => a + parseInput(b), 0) +
-                                    person.guestMeals.reduce((a, b) => a + parseInput(b), 0);
-                return sum + personTotal;
-            }, 0);
-
-            const display = document.getElementById('grand-total');
+            const total = mealData.reduce((sum, person) => sum + getBillingTotal(person), 0);
+            const display = document.getElementById("grand-total");
             if (display) display.textContent = formatNumber(total);
         }
 
-        /**
-         * Handles input changes in real-time for meal and guest meal entries, 
-         * updates data model, saves data, and recalculates totals.
-         * @param {Event} event - The input event object.
-         */
-        function handleInput(event) {
-            const input = event.target;
-            const personIndex = parseInt(input.dataset.person);
-            const dayIndex = parseInt(input.dataset.day);
-            const type = input.dataset.type;
-            const value = parseInput(input.value);
-
-            // 1. Update the data model (mealData array)
-            if (type === 'meal') {
-                mealData[personIndex].meals[dayIndex] = value;
-            } else if (type === 'guest') {
-                mealData[personIndex].guestMeals[dayIndex] = value;
+        async function handleTotalMembersChange(event) {
+            if (isReadOnlyForUser()) {
+                event.target.value = String(numPeople);
+                showMessage("History month is read-only", true);
+                return;
             }
 
-            // 2. Clear the input if the value is 0 (for clean placeholder display)
-            if (value === 0) {
-                input.value = '';
-            } else {
-                // Ensure the input displays the parsed value
-                input.value = value;
+            let newCount = parseInt(event.target.value, 10);
+            if (!Number.isInteger(newCount) || newCount < 1) newCount = 1;
+            event.target.value = String(newCount);
+            if (newCount === numPeople) return;
+
+            const resized = [];
+            for (let i = 0; i < newCount; i += 1) {
+                resized.push(normalizeMember(mealData[i], i));
             }
-
-            // 3. Recalculate totals for the affected person (updates only the sticky right column)
-            updateTotal(personIndex);
-
-            // 4. Save the entire data structure to localStorage
-            saveData(true);
+            mealData = resized;
+            numPeople = newCount;
+            renderTable();
+            await saveMonthData(true);
         }
 
-        // --- Application Startup ---
-        window.onload = function() {
-            initializeData();
-            renderTable();
-        };
+        async function handleNameInputChange(event) {
+            if (isReadOnlyForUser()) return;
 
-        // -- Floating Button ---
-        document.addEventListener('DOMContentLoaded', () => {
-            const fab = document.getElementById('floatingButton');
+            const input = event.target;
+            const personIndex = parseInt(input.dataset.person, 10);
+            const member = mealData[personIndex];
+            if (!member) return;
+
+            if (member.nameLocked && !isAdminMode) {
+                input.disabled = true;
+                return;
+            }
+
+            const value = input.value.trim();
+            if (!value && !isAdminMode) return;
+
+            if (!value && isAdminMode) {
+                member.name = `Member ${personIndex + 1}`;
+                member.nameLocked = false;
+            } else {
+                member.name = value;
+                if (!isAdminMode) member.nameLocked = true;
+            }
+
+            await saveMonthData(true);
+            renderTable();
+        }
+
+        async function handleMealInputChange(event) {
+            if (isReadOnlyForUser()) return;
+
+            const input = event.target;
+            const personIndex = parseInt(input.dataset.person, 10);
+            const dayIndex = parseInt(input.dataset.day, 10);
+            const type = input.dataset.type;
+            const member = mealData[personIndex];
+            if (!member) return;
+
+            const lockArr = type === "meal" ? member.mealLocked : member.guestMealLocked;
+            const targetArr = type === "meal" ? member.meals : member.guestMeals;
+
+            if (lockArr[dayIndex] && !isAdminMode) {
+                input.disabled = true;
+                return;
+            }
+
+            const raw = input.value.trim();
+            if (!raw) {
+                if (isAdminMode) {
+                    targetArr[dayIndex] = 0;
+                    lockArr[dayIndex] = false;
+                    await saveMonthData(true);
+                    renderTable();
+                }
+                return;
+            }
+
+            const value = parseInput(raw);
+            targetArr[dayIndex] = value;
+            if (!isAdminMode) lockArr[dayIndex] = true;
+
+            await saveMonthData(true);
+            renderTable();
+        }
+
+        async function handleMonthSelection(event) {
+            const selectedKey = event.target.value;
+            if (!selectedKey) return;
+            await openMonth(parseMonthKey(selectedKey));
+            updateAdminUI();
+        }
+
+        async function handleFixedMealSave() {
+            if (!isAdminMode) {
+                showMessage("Only admin can set fixed meal", true);
+                return;
+            }
+            let value = parseInput(fixedMealInput.value);
+            if (!Number.isFinite(value) || value < 0) value = 0;
+            fixedMeal = value;
+            fixedMealInput.value = String(formatNumber(fixedMeal));
+            renderTable();
+            await saveMonthData(true);
+        }
+
+        function bindEvents() {
+            membersInput.addEventListener("change", (event) => {
+                handleTotalMembersChange(event).catch((err) => {
+                    console.error(err);
+                    showMessage("Member update failed", true);
+                });
+            });
+
+            monthSelector.addEventListener("change", (event) => {
+                handleMonthSelection(event).catch((err) => {
+                    console.error(err);
+                    showMessage("Month load failed", true);
+                });
+            });
+
+            fixedMealSaveBtn.addEventListener("click", () => {
+                handleFixedMealSave().catch((err) => {
+                    console.error(err);
+                    showMessage("Fixed meal update failed", true);
+                });
+            });
+
+            adminLoginBtn.addEventListener("click", () => {
+                adminLoginPanel.classList.toggle("hidden");
+                adminPasswordInput.value = "";
+                adminPasswordInput.focus();
+            });
+
+            adminSubmitBtn.addEventListener("click", () => {
+                const pass = adminPasswordInput.value.trim();
+                if (pass === ADMIN_PASSWORD) {
+                    isAdminMode = true;
+                    updateAdminUI();
+                    showMessage("Admin unlocked");
+                } else {
+                    showMessage("Wrong admin password", true);
+                }
+            });
+
+            adminLogoutBtn.addEventListener("click", () => {
+                isAdminMode = false;
+                updateAdminUI();
+                showMessage("Admin locked");
+            });
+
+            const fab = document.getElementById("floatingButton");
             if (fab) {
-                fab.addEventListener('click', () => {
-                    window.open('https://mealcalapp.github.io/for-all/', '_blank');
+                fab.addEventListener("click", () => {
+                    window.open("https://mealcalapp.github.io/for-all/", "_blank");
                 });
             }
-        });
+        }
 
+        async function boot() {
+            try {
+                bindEvents();
+                const firebaseReady = initFirebase();
+                await cleanupOldMonths();
+                await loadMonthOptions();
+                await openMonth(selectedMonthDate);
+                if (!firebaseReady) {
+                    showMessage("Firebase config missing. Running Local Mode.", true);
+                }
+                updateAdminUI();
+            } catch (error) {
+                console.error(error);
+                showMessage(error.message || "Initialization failed", true);
+            }
+        }
+
+        window.addEventListener("load", () => {
+            boot();
+        });
     </script>
     <script src="https://cdn.jsdelivr.net/gh/mealcalapp/for-all/flip.js"></script>
     <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
