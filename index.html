@@ -223,7 +223,7 @@
             color: #64748b !important;
         }
 
-        .admin-badge {
+        .manager-badge {
             display: inline-block;
             font-size: 0.75rem;
             font-weight: 700;
@@ -233,48 +233,120 @@
             padding: 4px 10px;
             margin-left: 8px;
         }
+
+        .premium-header {
+            position: relative;
+            overflow: hidden;
+            background: linear-gradient(135deg, #0f172a 0%, #1d4ed8 45%, #06b6d4 100%);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            box-shadow: 0 18px 36px rgba(15, 23, 42, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+        }
+
+        .premium-header::before {
+            content: "";
+            position: absolute;
+            inset: -20% auto auto -10%;
+            width: 280px;
+            height: 280px;
+            border-radius: 9999px;
+            background: radial-gradient(circle, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0) 70%);
+            pointer-events: none;
+        }
+
+        .premium-header-content {
+            position: relative;
+            z-index: 1;
+        }
+
+        .header-glass-panel {
+            background: rgba(255, 255, 255, 0.14);
+            border: 1px solid rgba(255, 255, 255, 0.28);
+            border-radius: 14px;
+            padding: 12px;
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+        }
+
+        .header-label {
+            color: #dbeafe;
+            font-weight: 700;
+            font-size: 0.8rem;
+            letter-spacing: 0.01em;
+        }
+
+        .header-control {
+            background: rgba(255, 255, 255, 0.96);
+            border: 1px solid rgba(191, 219, 254, 0.9);
+            border-radius: 10px;
+            color: #0f172a;
+            font-weight: 600;
+        }
+
+        .header-control:focus {
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(125, 211, 252, 0.55);
+            border-color: rgba(125, 211, 252, 0.95);
+        }
+
+        .header-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 9999px;
+            color: #e2e8f0;
+            background: rgba(15, 23, 42, 0.36);
+            border: 1px solid rgba(255, 255, 255, 0.22);
+            font-weight: 600;
+        }
     </style>
 </head>
 <body class="p-4 md:p-8">
 
     <!-- Header Section -->
-    <header class="mb-6 md:mb-8 text-center bg-white p-4 rounded-xl shadow-lg border border-border-subtle">
-        <h1 id="month-header" class="text-3xl md:text-4xl font-extrabold text-primary-blue tracking-tight">
+    <header class="premium-header mb-6 md:mb-8 text-center p-5 md:p-6 rounded-2xl">
+        <div class="premium-header-content">
+        <h1 id="month-header" class="text-3xl md:text-4xl font-extrabold text-white tracking-tight drop-shadow-sm">
             <!-- Dynamic Month and Year will be injected here -->
         </h1>
-        <p class="text-sm text-gray-500 mt-1">Real-time monthly Meal Register</p>
+        <p class="text-sm text-blue-100 mt-1">Real-time monthly Meal Register</p>
         
-        <div class="mt-4 flex flex-wrap justify-center items-center gap-3">
-            <label for="total-members-input" class="text-sm font-medium text-gray-700">Total Members:</label>
+        <div class="header-glass-panel mt-4">
+        <div class="flex flex-wrap justify-center items-center gap-3">
+            <label for="total-members-input" class="header-label">Total Members</label>
             <input 
                 type="number"
                 id="total-members-input"
-                class="w-20 p-2 border border-gray-300 rounded-lg text-center focus:ring-primary-blue focus:border-primary-blue"
+                class="header-control w-20 p-2 text-center"
                 min="1"
                 max="999"
                 value="20"
             >
-            <label for="month-selector" class="text-sm font-medium text-gray-700">Previous History:</label>
-            <select id="month-selector" class="p-2 border border-gray-300 rounded-lg focus:ring-primary-blue focus:border-primary-blue"></select>
-            <label for="fixed-meal-input" class="text-sm font-medium text-gray-700">Fixed Meal:</label>
+            <label for="month-selector" class="header-label">History</label>
+            <select id="month-selector" class="header-control p-2"></select>
+            <label for="fixed-meal-input" class="header-label">Fixed Meal</label>
             <input
                 type="number"
                 id="fixed-meal-input"
-                class="w-24 p-2 border border-gray-300 rounded-lg text-center focus:ring-primary-blue focus:border-primary-blue"
+                class="header-control w-24 p-2 text-center"
                 min="0"
                 value="60"
             >
-            <button id="fixed-meal-save-btn" class="px-3 py-2 text-sm font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700">Set</button>
+            <button id="fixed-meal-save-btn" class="px-3 py-2 text-sm font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 shadow-lg shadow-indigo-900/30">Set</button>
+        </div>
         </div>
 
         <div class="mt-4 flex flex-wrap justify-center items-center gap-2">
-            <button id="admin-login-btn" class="px-3 py-2 text-sm font-semibold text-white bg-slate-700 rounded-lg hover:bg-slate-800">Manager Login</button>
-            <button id="admin-logout-btn" class="px-3 py-2 text-sm font-semibold text-white bg-rose-600 rounded-lg hover:bg-rose-700 hidden">Manager Logout</button>
-            <span id="admin-mode-indicator" class="text-sm text-slate-500">User Mode</span>
+            <label for="manager-name-input" class="header-label">Manager Name</label>
+            <input type="text" id="manager-name-input" class="header-control w-36 p-2 text-sm" placeholder="Type manager name">
+            <button id="manager-login-btn" class="px-3 py-2 text-sm font-semibold text-white bg-slate-900/75 border border-white/30 rounded-lg hover:bg-slate-900">Manager Login</button>
+            <button id="manager-logout-btn" class="px-3 py-2 text-sm font-semibold text-white bg-rose-600 rounded-lg hover:bg-rose-700 hidden">Manager Logout</button>
+            <span id="manager-mode-indicator" class="header-chip text-sm">Normal Mode</span>
         </div>
-        <div id="admin-login-panel" class="mt-3 flex flex-wrap justify-center items-center gap-2 hidden">
-            <input type="password" id="admin-password" class="w-40 p-2 border border-gray-300 rounded-lg text-sm" placeholder="Manager password">
-            <button id="admin-submit-btn" class="px-3 py-2 text-sm font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700">Login</button>
+        <div id="manager-login-panel" class="mt-3 flex flex-wrap justify-center items-center gap-2 hidden">
+            <input type="password" id="manager-password" class="header-control w-40 p-2 text-sm" placeholder="Manager password">
+            <button id="manager-submit-btn" class="px-3 py-2 text-sm font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700">Login</button>
+        </div>
         </div>
     </header>
     
@@ -318,9 +390,9 @@
             appId: "YOUR_APP_ID"
         };
 
-        const ADMIN_PASSWORD = "sk77";
         const COLLECTION_NAME = "mealRegisters";
         const LOCAL_FALLBACK_KEY = "mealRegistersLocalFallback";
+        const MANAGER_NAME_STORAGE_KEY = "mealRegisterManagerName";
         const MAX_DAYS = 31;
 
         const table = document.getElementById("meal-register-table");
@@ -329,12 +401,13 @@
         const monthSelector = document.getElementById("month-selector");
         const membersInput = document.getElementById("total-members-input");
         const marquee = document.getElementById("monthMarquee");
-        const adminLoginBtn = document.getElementById("admin-login-btn");
-        const adminLogoutBtn = document.getElementById("admin-logout-btn");
-        const adminModeIndicator = document.getElementById("admin-mode-indicator");
-        const adminLoginPanel = document.getElementById("admin-login-panel");
-        const adminPasswordInput = document.getElementById("admin-password");
-        const adminSubmitBtn = document.getElementById("admin-submit-btn");
+        const managerLoginBtn = document.getElementById("manager-login-btn");
+        const managerLogoutBtn = document.getElementById("manager-logout-btn");
+        const managerModeIndicator = document.getElementById("manager-mode-indicator");
+        const managerNameInput = document.getElementById("manager-name-input");
+        const managerLoginPanel = document.getElementById("manager-login-panel");
+        const managerPasswordInput = document.getElementById("manager-password");
+        const managerSubmitBtn = document.getElementById("manager-submit-btn");
         const fixedMealInput = document.getElementById("fixed-meal-input");
         const fixedMealSaveBtn = document.getElementById("fixed-meal-save-btn");
 
@@ -346,7 +419,7 @@
         let numPeople = 20;
         let fixedMeal = 60;
         let mealData = [];
-        let isAdminMode = false;
+        let isManagerMode = false;
         let selectedMonthDate = monthStart(new Date());
         let selectedMonthDays = getDaysInMonth(selectedMonthDate);
 
@@ -382,6 +455,23 @@
             return Number.isFinite(num) && num >= 0 ? num : 0;
         }
 
+        function getSavedManagerName() {
+            return (localStorage.getItem(MANAGER_NAME_STORAGE_KEY) || "").trim();
+        }
+
+        function saveManagerName(name) {
+            localStorage.setItem(MANAGER_NAME_STORAGE_KEY, name.trim());
+        }
+
+        function getExpectedManagerPassword() {
+            const managerPrefix = getSavedManagerName().slice(0, 3).toLowerCase();
+            const monthPrefix = monthStart(new Date())
+                .toLocaleDateString("en-US", { month: "long" })
+                .slice(0, 3)
+                .toLowerCase();
+            return `${managerPrefix}${monthPrefix}`;
+        }
+
         function formatNumber(num) {
             return Number.isInteger(num) ? String(num) : num.toFixed(1);
         }
@@ -391,7 +481,7 @@
         }
 
         function isReadOnlyForUser() {
-            return !isAdminMode && !isCurrentMonthView();
+            return !isManagerMode && !isCurrentMonthView();
         }
 
         function getDefaultMember(index) {
@@ -456,21 +546,21 @@
             }, 1800);
         }
 
-        function updateAdminUI() {
-            if (isAdminMode) {
-                adminModeIndicator.innerHTML = 'Manager Mode <span class="admin-badge"></span>';
-                adminLoginBtn.classList.add("hidden");
-                adminLogoutBtn.classList.remove("hidden");
-                adminLoginPanel.classList.add("hidden");
+        function updateManagerUI() {
+            if (isManagerMode) {
+                managerModeIndicator.innerHTML = 'Manager Mode <span class="manager-badge"></span>';
+                managerLoginBtn.classList.add("hidden");
+                managerLogoutBtn.classList.remove("hidden");
+                managerLoginPanel.classList.add("hidden");
                 fixedMealSaveBtn.classList.remove("hidden");
             } else {
-                adminModeIndicator.textContent = "User Mode";
-                adminLoginBtn.classList.remove("hidden");
-                adminLogoutBtn.classList.add("hidden");
+                managerModeIndicator.textContent = "User Mode";
+                managerLoginBtn.classList.remove("hidden");
+                managerLogoutBtn.classList.add("hidden");
                 fixedMealSaveBtn.classList.add("hidden");
             }
-            fixedMealInput.disabled = !isAdminMode;
-            fixedMealSaveBtn.disabled = !isAdminMode;
+            fixedMealInput.disabled = !isManagerMode;
+            fixedMealSaveBtn.disabled = !isManagerMode;
             renderTable();
         }
 
@@ -658,7 +748,7 @@
             const head = table.createTHead();
             const row = head.insertRow();
             row.insertCell().outerHTML = '<th class="sticky-col-left sticky-header text-center" style="min-width: 44px; width: 44px;">S/N</th>';
-            row.insertCell().outerHTML = '<th class="sticky-col-left sticky-header name-cell text-center" style="min-width: 135px; padding: 8px 12px;">Name</th>';
+            row.insertCell().outerHTML = '<th class="sticky-col-left sticky-header name-cell text-center" style="min-width: 140px; padding: 8px 12px;">Name</th>';
 
             for (let day = 1; day <= selectedMonthDays; day += 1) {
                 row.insertCell().outerHTML = `<th class="sticky-header text-center p-2">${day}</th>`;
@@ -706,7 +796,7 @@
                 nameInput.placeholder = defaultName;
                 nameInput.value = person.name.startsWith("Member ") ? "" : person.name;
                 nameInput.dataset.person = String(personIndex);
-                nameInput.disabled = (person.nameLocked && !isAdminMode) || isReadOnlyForUser();
+                nameInput.disabled = (person.nameLocked && !isManagerMode) || isReadOnlyForUser();
                 if (nameInput.disabled) nameInput.classList.add("locked-input");
                 nameInput.addEventListener("change", handleNameInputChange);
                 nameWrap.appendChild(nameInput);
@@ -714,7 +804,7 @@
 
                 for (let day = 0; day < selectedMonthDays; day += 1) {
                     const cell = mealRow.insertCell();
-                    const locked = person.mealLocked[day] && !isAdminMode;
+                    const locked = person.mealLocked[day] && !isManagerMode;
                     cell.appendChild(createMealInput(personIndex, day, "meal", person.meals[day], locked));
                 }
 
@@ -733,7 +823,7 @@
 
                 for (let day = 0; day < selectedMonthDays; day += 1) {
                     const cell = guestRow.insertCell();
-                    const locked = person.guestMealLocked[day] && !isAdminMode;
+                    const locked = person.guestMealLocked[day] && !isManagerMode;
                     cell.appendChild(createMealInput(personIndex, day, "guest", person.guestMeals[day], locked));
                 }
             });
@@ -808,20 +898,20 @@
             const member = mealData[personIndex];
             if (!member) return;
 
-            if (member.nameLocked && !isAdminMode) {
+            if (member.nameLocked && !isManagerMode) {
                 input.disabled = true;
                 return;
             }
 
             const value = input.value.trim();
-            if (!value && !isAdminMode) return;
+            if (!value && !isManagerMode) return;
 
-            if (!value && isAdminMode) {
+            if (!value && isManagerMode) {
                 member.name = `Member ${personIndex + 1}`;
                 member.nameLocked = false;
             } else {
                 member.name = value;
-                if (!isAdminMode) member.nameLocked = true;
+                if (!isManagerMode) member.nameLocked = true;
             }
 
             await saveMonthData(true);
@@ -841,14 +931,14 @@
             const lockArr = type === "meal" ? member.mealLocked : member.guestMealLocked;
             const targetArr = type === "meal" ? member.meals : member.guestMeals;
 
-            if (lockArr[dayIndex] && !isAdminMode) {
+            if (lockArr[dayIndex] && !isManagerMode) {
                 input.disabled = true;
                 return;
             }
 
             const raw = input.value.trim();
             if (!raw) {
-                if (isAdminMode) {
+                if (isManagerMode) {
                     targetArr[dayIndex] = 0;
                     lockArr[dayIndex] = false;
                     await saveMonthData(true);
@@ -859,7 +949,7 @@
 
             const value = parseInput(raw);
             targetArr[dayIndex] = value;
-            if (!isAdminMode) lockArr[dayIndex] = true;
+            if (!isManagerMode) lockArr[dayIndex] = true;
 
             await saveMonthData(true);
             renderTable();
@@ -869,12 +959,12 @@
             const selectedKey = event.target.value;
             if (!selectedKey) return;
             await openMonth(parseMonthKey(selectedKey));
-            updateAdminUI();
+            updateManagerUI();
         }
 
         async function handleFixedMealSave() {
-            if (!isAdminMode) {
-                showMessage("Only admin can set fixed meal", true);
+            if (!isManagerMode) {
+                showMessage("Only manager can set fixed meal", true);
                 return;
             }
             let value = parseInput(fixedMealInput.value);
@@ -907,27 +997,32 @@
                 });
             });
 
-            adminLoginBtn.addEventListener("click", () => {
-                adminLoginPanel.classList.toggle("hidden");
-                adminPasswordInput.value = "";
-                adminPasswordInput.focus();
+            managerLoginBtn.addEventListener("click", () => {
+                managerLoginPanel.classList.toggle("hidden");
+                managerPasswordInput.value = "";
+                managerPasswordInput.focus();
             });
 
-            adminSubmitBtn.addEventListener("click", () => {
-                const pass = adminPasswordInput.value.trim();
-                if (pass === ADMIN_PASSWORD) {
-                    isAdminMode = true;
-                    updateAdminUI();
-                    showMessage("Admin unlocked");
+            managerSubmitBtn.addEventListener("click", () => {
+                const managerName = getSavedManagerName();
+                if (managerName.length < 3) {
+                    showMessage("Set manager name first (min 3 letters)", true);
+                    return;
+                }
+                const pass = managerPasswordInput.value.trim();
+                if (pass.toLowerCase() === getExpectedManagerPassword()) {
+                    isManagerMode = true;
+                    updateManagerUI();
+                    showMessage("Manager unlocked");
                 } else {
-                    showMessage("Wrong admin password", true);
+                    showMessage("Wrong manager password", true);
                 }
             });
 
-            adminLogoutBtn.addEventListener("click", () => {
-                isAdminMode = false;
-                updateAdminUI();
-                showMessage("Admin locked");
+            managerLogoutBtn.addEventListener("click", () => {
+                isManagerMode = false;
+                updateManagerUI();
+                showMessage("Manager locked");
             });
 
             const fab = document.getElementById("floatingButton");
@@ -936,10 +1031,19 @@
                     window.open("https://mealcalapp.github.io/for-all/", "_blank");
                 });
             }
+
+            if (managerNameInput) {
+                managerNameInput.addEventListener("input", () => {
+                    saveManagerName(managerNameInput.value);
+                });
+            }
         }
 
         async function boot() {
             try {
+                if (managerNameInput) {
+                    managerNameInput.value = getSavedManagerName();
+                }
                 bindEvents();
                 const firebaseReady = initFirebase();
                 await cleanupOldMonths();
@@ -948,7 +1052,7 @@
                 if (!firebaseReady) {
                     showMessage("Firebase config missing. Running Local Mode.", true);
                 }
-                updateAdminUI();
+                updateManagerUI();
             } catch (error) {
                 console.error(error);
                 showMessage(error.message || "Initialization failed", true);
