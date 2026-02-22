@@ -218,8 +218,22 @@
 
         .locked-input {
             cursor: not-allowed;
-            background-color: #f8fafc !important;
+            background-color: transparent !important;
             color: #64748b !important;
+        }
+
+        /* Locked guest meal input stays red */
+        .meal-input.text-pink-700.locked-input,
+        .meal-input.text-pink-700.locked-input:disabled {
+        color: #dc2626 !important;
+        -webkit-text-fill-color: #dc2626; /* Safari */
+        opacity: 1;
+        }
+
+        .manager-name-locked {
+            background: rgba(15, 23, 42, 0.26) !important;
+            color: #cbd5e1 !important;
+            border-color: rgba(148, 163, 184, 0.36) !important;
         }
 
         .manager-badge {
@@ -333,25 +347,25 @@
         <div class="header-glass-panel mt-4">
         <div class="flex flex-wrap justify-center items-center gap-3">
             <div id="manager-only-total-members" class="manager-only-control hidden flex items-center gap-2">
-                <label for="total-members-input" class="header-label">Total Members</label>
+                <label for="total-members-input" class="header-label">Members</label>
                 <input
                     type="number"
                     id="total-members-input"
-                    class="header-control w-20 p-2 text-center"
+                    class="header-control w-11 p-2 text-center"
                     min="1"
                     max="999"
                     value="20"
                 >
             </div>
             <div id="manager-only-history" class="flex items-center gap-2">
-                <label for="month-selector" class="header-label">View Month</label>
+                <label for="month-selector" class="header-label">History</label>
                 <select id="month-selector" class="header-control p-2"></select>
             </div>
             <label for="fixed-meal-input" class="header-label">Fixed Meal</label>
             <input
                 type="number"
                 id="fixed-meal-input"
-                class="header-control w-24 p-2 text-center"
+                class="header-control w-11 p-2 text-center"
                 min="0"
                 value="60"
             >
@@ -359,16 +373,16 @@
         </div>
         </div>
 
-        <div class="mt-4 flex flex-wrap justify-center items-center gap-2">
+        <div class="mt-3 flex flex-wrap justify-center items-center gap-2">
             <label for="manager-name-input" class="header-label">Manager Name</label>
-            <input type="text" id="manager-name-input" class="header-control w-36 p-2 text-sm" placeholder="Type manager name">
+            <input type="text" id="manager-name-input" class="header-control w-20 p-2 text-sm" placeholder="Name">
+            <span id="manager-mode-indicator" class="header-chip text-sm">Member Mode</span>
             <button id="manager-login-btn" class="px-3 py-2 text-sm font-semibold text-white bg-slate-900/75 border border-white/30 rounded-lg hover:bg-slate-900">Manager Login</button>
             <button id="manager-logout-btn" class="px-3 py-2 text-sm font-semibold text-white bg-rose-600 rounded-lg hover:bg-rose-700 hidden">Manager Logout</button>
-            <span id="manager-mode-indicator" class="header-chip text-sm">User Mode</span>
         </div>
         <div id="manager-login-panel" class="mt-3 flex flex-wrap justify-center items-center gap-2 hidden">
             <input type="password" id="manager-password" class="header-control w-40 p-2 text-sm" placeholder="Manager password">
-            <button id="manager-submit-btn" class="px-3 py-2 text-sm font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700">Unlock</button>
+            <button id="manager-submit-btn" class="px-3 py-2 text-sm font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700">Login</button>
         </div>
         </div>
     </header>
@@ -435,6 +449,7 @@
         const fixedMealInput = document.getElementById("fixed-meal-input");
         const fixedMealSaveBtn = document.getElementById("fixed-meal-save-btn");
         const managerOnlyControls = document.querySelectorAll("#manager-only-total-members");
+        const managerHistoryControl = document.getElementById("manager-only-history");
 
         let db = null;
         let monthDocRef = null;
@@ -577,22 +592,24 @@
 
         function updateManagerUI() {
             if (isManagerMode) {
-                managerModeIndicator.innerHTML = 'Manager Mode <span class="manager-badge">UNLOCKED</span>';
+                managerModeIndicator.innerHTML = 'Manager Mode <span class="manager-badge"></span>';
                 managerLoginBtn.classList.add("hidden");
                 managerLogoutBtn.classList.remove("hidden");
                 managerLoginPanel.classList.add("hidden");
                 fixedMealSaveBtn.classList.remove("hidden");
                 managerOnlyControls.forEach((el) => el.classList.remove("hidden"));
+                if (managerHistoryControl) managerHistoryControl.classList.add("hidden");
             } else {
-                managerModeIndicator.textContent = "User Mode";
+                managerModeIndicator.textContent = "Member Mode";
                 managerLoginBtn.classList.remove("hidden");
                 managerLogoutBtn.classList.add("hidden");
                 fixedMealSaveBtn.classList.add("hidden");
                 managerOnlyControls.forEach((el) => el.classList.add("hidden"));
+                if (managerHistoryControl) managerHistoryControl.classList.remove("hidden");
             }
             if (managerNameInput) {
                 managerNameInput.readOnly = !isManagerMode;
-                managerNameInput.classList.toggle("locked-input", !isManagerMode);
+                managerNameInput.classList.toggle("manager-name-saved", !isManagerMode);
             }
             fixedMealInput.disabled = !isManagerMode || isReadOnlyForUser();
             fixedMealSaveBtn.disabled = !isManagerMode || isReadOnlyForUser();
@@ -1053,7 +1070,7 @@
                 if (isMasterPass || isMonthlyManagerPass) {
                     isManagerMode = true;
                     updateManagerUI();
-                    showMessage(isMasterPass ? "Main manager unlocked" : "Manager unlocked");
+                    showMessage(isMasterPass ? "Main manager login success" : "Manager login success");
                 } else {
                     if (pass.toLowerCase() === MASTER_MANAGER_PASSWORD && hasManagerName) {
                         showMessage("Main pass disabled after manager name is set", true);
@@ -1073,7 +1090,7 @@
                     .then(() => {
                         monthSelector.value = getMonthKey(selectedMonthDate);
                         updateManagerUI();
-                        showMessage("Manager locked");
+                        showMessage("Manager logout success");
                     })
                     .catch((err) => {
                         console.error(err);
