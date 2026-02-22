@@ -345,37 +345,57 @@
         <p class="text-sm text-blue-100 mt-1">Real-time monthly Meal Register</p>
         
         <div class="header-glass-panel mt-4">
-        <div class="flex flex-wrap justify-center items-center gap-3">
-            <div id="manager-only-total-members" class="manager-only-control hidden flex items-center gap-2">
-                <label for="total-members-input" class="header-label">Members</label>
-                <input
-                    type="number"
-                    id="total-members-input"
-                    class="header-control w-11 p-2 text-center"
-                    min="1"
-                    max="999"
-                    value="20"
-                >
+            <div class="flex flex-wrap justify-center items-center gap-3">
+                <div id="manager-only-total-members" class="manager-only-control hidden flex items-center gap-2">
+                    <label for="total-members-input" class="header-label">Members</label>
+                    <input
+                        type="number"
+                        id="total-members-input"
+                        class="header-control w-11 p-2 text-center"
+                        min="1"
+                        max="999"
+                        value="20"
+                    >
+                </div>
+
+                <div style="display:flex; flex-direction:column; gap:10px; align-items:center;">
+
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <label for="manager-name-input" class="header-label">Manager Name</label>
+                        <input
+                            type="text"
+                            id="manager-name-input"
+                            class="header-control w-28 p-1.5 text-sm"
+                            placeholder="Manager"
+                        >
+                    </div>
+
+                    <div id="manager-only-history" style="display:flex; align-items:center; gap:10px;">
+                        <label for="month-selector" class="header-label">History</label>
+                        <select
+                            id="month-selector"
+                            class="header-control p-1"
+                        ></select>
+                    </div>
+
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <label for="fixed-meal-input" class="header-label">Fixed Meal</label>
+                        <input
+                            type="number"
+                            id="fixed-meal-input"
+                            class="header-control w-11 p-1.5 text-center"
+                            min="0"
+                            value="60"
+                        >
+                    </div>
+
+                </div>
+                <button id="fixed-meal-save-btn" class="px-3 py-2 text-sm font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 shadow-lg shadow-indigo-900/30">Set</button>
             </div>
-            <div id="manager-only-history" class="flex items-center gap-2">
-                <label for="month-selector" class="header-label">History</label>
-                <select id="month-selector" class="header-control p-2"></select>
-            </div>
-            <label for="fixed-meal-input" class="header-label">Fixed Meal</label>
-            <input
-                type="number"
-                id="fixed-meal-input"
-                class="header-control w-11 p-2 text-center"
-                min="0"
-                value="60"
-            >
-            <button id="fixed-meal-save-btn" class="px-3 py-2 text-sm font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 shadow-lg shadow-indigo-900/30">Set</button>
-        </div>
         </div>
 
         <div class="mt-3 flex flex-wrap justify-center items-center gap-2">
-            <label for="manager-name-input" class="header-label">Manager Name</label>
-            <input type="text" id="manager-name-input" class="header-control w-20 p-2 text-sm" placeholder="Name">
+           
             <span id="manager-mode-indicator" class="header-chip text-sm">Member Mode</span>
             <button id="manager-login-btn" class="px-3 py-2 text-sm font-semibold text-white bg-slate-900/75 border border-white/30 rounded-lg hover:bg-slate-900">Manager Login</button>
             <button id="manager-logout-btn" class="px-3 py-2 text-sm font-semibold text-white bg-rose-600 rounded-lg hover:bg-rose-700 hidden">Manager Logout</button>
@@ -1077,7 +1097,7 @@
                         return;
                     }
                     if (!hasManagerName) {
-                        showMessage("No manager name set. Use main admin pass first.", true);
+                        showMessage("No manager name set. Use main pass (sk77) first.", true);
                         return;
                     }
                     showMessage("Wrong manager password", true);
