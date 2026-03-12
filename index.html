@@ -434,20 +434,21 @@
         <span class="hidden md:inline">Meal Calculator</span>
     </button>
     <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-analytics-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-database-compat.js"></script>
     <script>
-        // Replace this with your own Firebase project config.
-        // You can also set `window.FIREBASE_CONFIG = {...}` before this script.
         const FIREBASE_CONFIG = window.FIREBASE_CONFIG || {
-            apiKey: "YOUR_API_KEY",
-            authDomain: "YOUR_PROJECT.firebaseapp.com",
-            projectId: "YOUR_PROJECT_ID",
-            storageBucket: "YOUR_PROJECT.appspot.com",
-            messagingSenderId: "YOUR_SENDER_ID",
-            appId: "YOUR_APP_ID"
+            apiKey: "AIzaSyBCL4AUrRQ0puDGCY5cjajzuIfAbTNx4i8",
+            authDomain: "meal-register.firebaseapp.com",
+            databaseURL: "https://meal-register-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "meal-register",
+            storageBucket: "meal-register.firebasestorage.app",
+            messagingSenderId: "341789648553",
+            appId: "1:341789648553:web:c6ff59c9f2353bc75babb8",
+            measurementId: "G-97V9KR8JLZ"
         };
 
-        const COLLECTION_NAME = "mealRegisters";
+        const COLLECTION_NAME = "meal_register";
         const LOCAL_FALLBACK_KEY = "mealRegistersLocalFallback";
         const MANAGER_NAME_STORAGE_KEY_PREFIX = "mealRegisterManagerName";
         const MASTER_MANAGER_PASSWORD = "sk77";
@@ -472,6 +473,7 @@
         const managerHistoryControl = document.getElementById("manager-only-history");
 
         let db = null;
+        let analytics = null;
         let monthDocRef = null;
         let unsubscribeMonth = null;
         let isFirebaseMode = false;
@@ -652,7 +654,7 @@
         }
 
         function initFirebase() {
-            if (!FIREBASE_CONFIG || FIREBASE_CONFIG.apiKey === "YOUR_API_KEY") {
+            if (!FIREBASE_CONFIG || !FIREBASE_CONFIG.apiKey) {
                 isFirebaseMode = false;
                 return false;
             }
@@ -660,7 +662,14 @@
             if (!firebase.apps.length) {
                 firebase.initializeApp(FIREBASE_CONFIG);
             }
-            db = firebase.firestore();
+            db = firebase.database();
+            if (typeof firebase.analytics === "function") {
+                try {
+                    analytics = firebase.analytics();
+                } catch (error) {
+                    console.warn("Firebase analytics unavailable", error);
+                }
+            }
             isFirebaseMode = true;
             return true;
         }
@@ -678,9 +687,11 @@
                 return;
             }
 
-            const docId = firebase.firestore.FieldPath.documentId();
-            const snapshot = await db.collection(COLLECTION_NAME).orderBy(docId).endBefore(thresholdKey).get();
-            const deletes = snapshot.docs.map((doc) => doc.ref.delete());
+            const snapshot = await db.ref(COLLECTION_NAME).once("value");
+            const data = snapshot.val() || {};
+            const deletes = Object.keys(data)
+                .filter((key) => key < thresholdKey)
+                .map((key) => db.ref(`${COLLECTION_NAME}/${key}`).remove());
             await Promise.all(deletes);
         }
 
@@ -699,11 +710,11 @@
                     if (!Number.isNaN(maybeDate.getTime())) keyToDate.set(key, maybeDate);
                 });
             } else {
-                const docId = firebase.firestore.FieldPath.documentId();
-                const snapshot = await db.collection(COLLECTION_NAME).orderBy(docId, "desc").limit(6).get();
-                snapshot.docs.forEach((doc) => {
-                    const maybeDate = parseMonthKey(doc.id);
-                    if (!Number.isNaN(maybeDate.getTime())) keyToDate.set(doc.id, maybeDate);
+                const snapshot = await db.ref(COLLECTION_NAME).once("value");
+                const data = snapshot.val() || {};
+                Object.keys(data).forEach((key) => {
+                    const maybeDate = parseMonthKey(key);
+                    if (!Number.isNaN(maybeDate.getTime())) keyToDate.set(key, maybeDate);
                 });
             }
 
@@ -730,7 +741,7 @@
                 memberCount: numPeople,
                 fixedMeal,
                 members: mealData,
-                updatedAt: db ? firebase.firestore.FieldValue.serverTimestamp() : Date.now()
+                updatedAt: Date.now()
             };
         }
 
@@ -744,7 +755,7 @@
                 return;
             }
             if (!monthDocRef) return;
-            await monthDocRef.set(buildPayload(), { merge: true });
+            await monthDocRef.set(buildPayload());
             if (showFeedback) showMessage("Saved");
         }
 
@@ -778,11 +789,11 @@
                 return;
             }
 
-            monthDocRef = db.collection(COLLECTION_NAME).doc(monthKey);
-
             if (unsubscribeMonth) unsubscribeMonth();
-            unsubscribeMonth = monthDocRef.onSnapshot(async (snapshot) => {
-                if (!snapshot.exists) {
+            monthDocRef = db.ref(`${COLLECTION_NAME}/${monthKey}`);
+            const activeMonthRef = monthDocRef;
+            const handleSnapshot = async (snapshot) => {
+                if (!snapshot.exists()) {
                     numPeople = 20;
                     fixedMeal = 60;
                     mealData = Array.from({ length: numPeople }, (_, index) => getDefaultMember(index));
@@ -793,7 +804,7 @@
                     return;
                 }
 
-                const data = snapshot.data() || {};
+                const data = snapshot.val() || {};
                 const incomingCount = Number.isInteger(data.memberCount) && data.memberCount > 0 ? data.memberCount : 20;
                 const incomingFixed = Number.isFinite(Number(data.fixedMeal)) ? parseInput(data.fixedMeal) : 60;
                 numPeople = incomingCount;
@@ -802,10 +813,13 @@
                 membersInput.value = String(numPeople);
                 fixedMealInput.value = String(fixedMeal);
                 renderTable();
-            }, (error) => {
+            };
+            const handleError = (error) => {
                 console.error(error);
                 showMessage("Realtime sync error", true);
-            });
+            };
+            activeMonthRef.on("value", handleSnapshot, handleError);
+            unsubscribeMonth = () => activeMonthRef.off("value", handleSnapshot);
         }
 
         function renderTable() {
