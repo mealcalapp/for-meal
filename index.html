@@ -567,7 +567,7 @@
         let fixedMeal = 60;
         let mealData = [];
         let isManagerMode = false;
-        let isNoteVisible = false;
+        let isNoteVisible = true;
         let monthNote = "";
         let selectedMonthDate = monthStart(new Date());
         let selectedMonthDays = getDaysInMonth(selectedMonthDate);
@@ -1321,8 +1321,11 @@
 
             if (noteToggleBtn) {
                 noteToggleBtn.addEventListener("click", () => {
-                    isNoteVisible = !isNoteVisible;
+                    isNoteVisible = true;
                     renderNotes();
+                    if (notesPanel) {
+                        notesPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+                    }
                 });
             }
 
