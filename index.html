@@ -955,12 +955,12 @@
                 const store = readLocalStore();
                 store[key] = buildPayload();
                 writeLocalStore(store);
-                if (showFeedback) showMessage("Saved (Local Mode)");
+                // disabled save message
                 return;
             }
             if (!monthDocRef) return;
             await monthDocRef.set(buildPayload());
-            if (showFeedback) showMessage("Saved");
+            // disabled save message
         }
 
         async function openMonth(date) {
@@ -1083,7 +1083,7 @@
             input.value = value === 0 ? "" : formatNumber(value);
             input.disabled = locked || isReadOnlyForUser();
             if (input.disabled) input.classList.add("locked-input");
-            input.addEventListener("change", handleMealInputChange);
+            input.addEventListener("input", handleMealInputChange);
             return input;
         }
 
@@ -1255,8 +1255,8 @@
                 if (isManagerMode) {
                     targetArr[dayIndex] = 0;
                     lockArr[dayIndex] = false;
-                    await saveMonthData(true);
-                    renderTable();
+                    saveMonthData(false);
+updateTotal(personIndex);
                 }
                 return;
             }
