@@ -1,0 +1,436 @@
+ /* Apply Inter font family and smooth transitions */
+        body {
+            font-family: 'Inter', 'sans-serif';
+            background-color: #F3F4F6; /* Light gray background */
+        }
+
+        /* Essential scroll container for sticky elements */
+        #table-container {
+            overflow: auto;
+            max-height: 85vh; /* Keep it visible on most screens */
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            background-color: white;
+            border-radius: 12px;
+            border: 1px solid #E5E7EB;
+        }
+
+        /* Sticky header (Day numbers: 1 to 31) */
+        .sticky-header {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            background-color: #DDE6EF; /* Match name header background */
+        }
+
+        /* Sticky first column (Serial and Name) */
+        .sticky-col-left {
+            position: sticky;
+            left: 0;
+            z-index: 11; /* Higher than header to stay on top */
+            background-color: #EBF1F7; /* Subtle blue-gray for the person column */
+        }
+
+        /* Sticky last column (Total Meal) - Updated background for clarity */
+        .sticky-col-right {
+            position: sticky;
+            right: 0;
+            z-index: 9;
+            background-color: #EBF1F7; /* Subtle gray for the total column */
+            font-weight: 600;
+        }
+
+        /* Make right header cell sticky on scroll */
+        .sticky-col-right.sticky-header {
+            position: sticky;
+            right: 0;
+            top: 0;
+            z-index: 12; /* higher than table body */
+            background-color: #DDE6EF; /* same tone as left corner cell */
+        }
+
+        /* Ensure corner (Top-Left cell) is on top of both sticky axis */
+        .sticky-col-left.sticky-header {
+            z-index: 12;
+            background-color: #DDE6EF; /* Darker corner for emphasis */
+        }
+
+        /* Custom input styling for meal entries */
+        .meal-input {
+            width: 100%;
+            height: 40px;
+            text-align: center;
+            border: none;
+            padding: 0 4px;
+            transition: all 0.1s ease-in-out;
+            background-color: transparent;
+        }
+        .meal-input:focus {
+            outline: 2px solid #60A5FA; /* Blue focus ring */
+            background-color: #EBF8FF; /* Light blue on focus */
+        }
+
+        /* Table cells padding and borders */
+        th, td {
+            border: 1px solid #E5E7EB;
+            padding: 0;
+            white-space: nowrap; /* Prevent wrapping in cells */
+            min-width: 50px; /* Default width for day cells */
+        }
+        /* Name and Serial cell padding is handled by the input/label for better visual control */
+        .name-cell, .serial-cell {
+            padding: 0; 
+            text-align: left;
+            min-width: 100px;
+            max-width: 150px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .serial-cell {
+            min-width: 44px;
+            max-width: 44px;
+            width: 44px;
+            text-align: center;
+        }
+        
+        /* Specific styling for the editable name input */
+        .name-input {
+            padding: 8px 12px !important; /* Ensure name input has proper padding */
+            text-align: left !important;
+            width: 100%;
+            height: 100% !important; /* Ensure input fills the cell vertically */
+            font-weight: 500;
+            color: #1F2937; /* Darker text */
+            border: none; /* Remove default input border */
+            background-color: transparent;
+        }
+        .name-input::placeholder {
+            color: #9CA3AF; /* Light gray placeholder */
+        }
+        .name-input:focus {
+            background-color: #EBF8FF;
+            outline: none;
+            box-shadow: 0 0 0 1px #60A5FA inset;
+        }
+
+        /* Style for the inline totals displayed next to the name (Not used, but keeping CSS definitions clean) */
+        .inline-total-display {
+            font-size: 0.7rem; /* Smaller text for compact display */
+            line-height: 1.2;
+            padding: 4px 12px;
+            margin-top: 4px;
+            border-top: 1px dashed #BFDBFE; /* Subtle separator line */
+            background-color: #EBF1F7; /* Match sticky left background */
+        }
+        .inline-total-display > div > span:last-child {
+            font-weight: 700;
+        }
+
+        /* Styling for the Guest Meal row */
+        .guest-row td {
+            background-color: #EBF1F7; /* Guest row background */
+        }
+
+        /* Add a visible space between person groups */
+        .person-group-end {
+            border-bottom: 2px solid #60A5FA; /* Stronger border line */
+        }
+
+        /* Styling for sticky right total display components */
+        .total-cell-tm, .total-cell-gm, .total-cell-combined {
+            padding: 2px 4px;
+            font-size: 0.8rem;
+            line-height: 1.2;
+            text-align: right;
+            border: none;
+        }
+        .total-cell-tm { color: #10B981; } /* Green for Total Meal */
+        .total-cell-gm { color: #EF4444; } /* Red for Guest Meal */
+        .total-cell-combined { 
+            color: #3B82F6; /* Primary Blue for Combined Total */
+            font-weight: 700;
+            padding-top: 8px; /* Add padding above to separate from TM/GM */
+            border-top: 1px dashed #BFDBFE; /* Subtle separator line */
+        }
+
+        /* Responsive adjustments for smaller screens */
+        @media (max-width: 768px) {
+            .name-cell, .serial-cell {
+                min-width: 80px;
+            }
+            th, td {
+                min-width: 40px;
+            }
+            .total-cell-tm, .total-cell-gm, .total-cell-combined {
+                font-size: 0.7rem;
+            }
+        }
+
+        input[type=number]::-webkit-outer-spin-button,
+        input[type=number]::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+        }
+
+        .locked-input {
+            cursor: not-allowed;
+            background-color: transparent !important;
+            color: #64748b !important;
+        }
+
+        /* Locked guest meal input stays red */
+        .meal-input.text-pink-700.locked-input,
+        .meal-input.text-pink-700.locked-input:disabled {
+        color: #dc2626 !important;
+        -webkit-text-fill-color: #dc2626; /* Safari */
+        opacity: 1;
+        }
+
+        .manager-name-locked {
+            background: rgba(15, 23, 42, 0.26) !important;
+            color: #cbd5e1 !important;
+            border-color: rgba(148, 163, 184, 0.36) !important;
+        }
+
+        .manager-badge {
+            display: inline-block;
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: #ffffff;
+            background-color: #0f766e;
+            border-radius: 9999px;
+            padding: 4px 10px;
+            margin-left: 8px;
+        }
+
+        .premium-header {
+            position: relative;
+            overflow: hidden;
+            background: linear-gradient(135deg, #0f172a 0%, #1d4ed8 45%, #06b6d4 100%);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            box-shadow: 0 18px 36px rgba(15, 23, 42, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+        }
+
+        .premium-header::before {
+            content: "";
+            position: absolute;
+            inset: -20% auto auto -10%;
+            width: 280px;
+            height: 280px;
+            border-radius: 9999px;
+            background: radial-gradient(circle, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0) 70%);
+            pointer-events: none;
+        }
+
+        .premium-header-content {
+            position: relative;
+            z-index: 1;
+        }
+
+        .header-glass-panel {
+            background: rgba(255, 255, 255, 0.14);
+            border: 1px solid rgba(255, 255, 255, 0.28);
+            border-radius: 14px;
+            padding: 12px;
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+        }
+
+        .header-label {
+            color: #dbeafe;
+            font-weight: 700;
+            font-size: 0.8rem;
+            letter-spacing: 0.01em;
+        }
+
+        .header-control {
+            background: rgba(15, 23, 42, 0.42);
+            border: 1px solid rgba(186, 230, 253, 0.42);
+            border-radius: 10px;
+            color: #f8fafc;
+            font-weight: 600;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+        }
+
+        .header-control:focus {
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(125, 211, 252, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            border-color: rgba(186, 230, 253, 0.85);
+        }
+
+        .header-control::placeholder {
+            color: #bfdbfe;
+            opacity: 0.95;
+        }
+
+        .header-control:disabled {
+            background: rgba(15, 23, 42, 0.26);
+            color: #cbd5e1;
+            border-color: rgba(148, 163, 184, 0.36);
+            cursor: not-allowed;
+        }
+
+        .header-control option {
+            color: #0f172a;
+            background: #f8fafc;
+        }
+
+        .header-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 9999px;
+            color: #e2e8f0;
+            background: rgba(15, 23, 42, 0.36);
+            border: 1px solid rgba(255, 255, 255, 0.22);
+            font-weight: 600;
+        }
+
+        .note-toggle-btn {
+            background: rgba(255, 255, 255, 0.16);
+            border: 1px solid rgba(255, 255, 255, 0.28);
+        }
+
+        .bazar-toggle-btn {
+            background: rgba(255, 255, 255, 0.16);
+            border: 1px solid rgba(255, 255, 255, 0.28);
+        }
+
+        .notes-panel {
+            display: none;
+            margin-top: 18px;
+            background:
+                linear-gradient(180deg, rgba(255, 248, 196, 0.92) 0%, rgba(255, 245, 168, 0.92) 100%);
+            border: 1px solid rgba(217, 119, 6, 0.18);
+            border-radius: 22px;
+            box-shadow: 0 20px 32px rgba(15, 23, 42, 0.1);
+            overflow: hidden;
+        }
+
+        .notes-panel.visible {
+            display: block;
+        }
+
+        .notes-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 14px 18px;
+            background: rgba(255, 255, 255, 0.46);
+            border-bottom: 1px solid rgba(217, 119, 6, 0.18);
+        }
+
+        .notes-title {
+            font-size: 1rem;
+            font-weight: 800;
+            color: #854d0e;
+            letter-spacing: 0.01em;
+        }
+
+        .notes-hint {
+            font-size: 0.8rem;
+            color: #a16207;
+        }
+
+        .notes-editor {
+            width: 100%;
+            min-height: 260px;
+            border: none;
+            resize: vertical;
+            padding: 22px 20px 26px;
+            background:
+                repeating-linear-gradient(
+                    to bottom,
+                    rgba(0, 0, 0, 0) 0,
+                    rgba(0, 0, 0, 0) 32px,
+                    rgba(217, 119, 6, 0.12) 33px
+                );
+            background-color: transparent;
+            color: #3f3f46;
+            font-size: 16px;
+            line-height: 22px !important;
+            font-family: 'Inter', sans-serif;
+
+        }
+
+        .notes-editor:focus {
+            outline: none;
+            background-color: rgba(255, 255, 255, 0.12);
+        }
+
+        .notes-editor:disabled {
+            color: #52525b;
+            opacity: 1;
+            cursor: default;
+        }
+
+        .bazar-panel {
+            display: none;
+            margin-top: 18px;
+            background:
+                linear-gradient(180deg, rgba(220, 252, 231, 0.96) 0%, rgba(187, 247, 208, 0.96) 100%);
+            border: 1px solid rgba(22, 163, 74, 0.16);
+            border-radius: 22px;
+            box-shadow: 0 20px 32px rgba(15, 23, 42, 0.08);
+            overflow: hidden;
+        }
+
+        .bazar-panel.visible {
+            display: block;
+        }
+
+        .bazar-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 14px 18px;
+            background: rgba(255, 255, 255, 0.46);
+            border-bottom: 1px solid rgba(22, 163, 74, 0.14);
+        }
+
+        .bazar-title {
+            font-size: 1rem;
+            font-weight: 800;
+            color: #166534;
+            letter-spacing: 0.01em;
+        }
+
+        .bazar-hint {
+            font-size: 0.8rem;
+            color: #15803d;
+        }
+
+        .bazar-editor {
+            width: 100%;
+            min-height: 260px;
+            border: none;
+            resize: vertical;
+            padding: 22px 20px 26px;
+            background:
+                repeating-linear-gradient(
+                    to bottom,
+                    rgba(0, 0, 0, 0) 0,
+                    rgba(0, 0, 0, 0) 32px,
+                    rgba(22, 163, 74, 0.12) 33px
+                );
+            background-color: transparent;
+            color: #14532d;
+            font-size: 16px;
+            line-height: 22px !important;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .bazar-editor:focus {
+            outline: none;
+            background-color: rgba(255, 255, 255, 0.12);
+        }
+
+        .bazar-editor:disabled {
+            color: #166534;
+            opacity: 1;
+            cursor: default;
+        }
