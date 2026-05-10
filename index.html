@@ -26,10 +26,23 @@
 
 <!-- Skeleton Loader -->
 <div id="skeleton-overlay">
-    <div class="skeleton-card">
-        <div class="skeleton-spinner"></div>
-        <p class="text-slate-600 font-semibold text-sm">Loading Meal Register…</p>
+  <div style="text-align:center; padding: 32px 36px; position:relative; z-index:1;">
+
+    <div style="width:72px;height:72px;border-radius:9999px;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.22);display:flex;align-items:center;justify-content:center;margin:0 auto 18px;position:relative;">
+      <i class="fas fa-utensils" style="font-size:28px;color:#fff;"></i>
+      <div style="position:absolute;inset:-5px;border-radius:9999px;border:2.5px solid transparent;border-top-color:#67e8f9;border-right-color:rgba(103,232,249,0.3);animation:spin 1s linear infinite;"></div>
     </div>
+
+    <div style="font-size:20px;font-weight:800;color:#fff;margin-bottom:4px;">Monthly Meal Register</div>
+    <div style="font-size:13px;color:#bfdbfe;margin-bottom:20px;">Connecting to Firebase…</div>
+
+    <div style="display:flex;justify-content:center;gap:7px;">
+      <div class="load-dot"></div>
+      <div class="load-dot"></div>
+      <div class="load-dot"></div>
+    </div>
+
+  </div>
 </div>
 
 <!-- Toast -->
