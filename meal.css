@@ -575,7 +575,7 @@ input[type=number]::-webkit-inner-spin-button {
     /* Table */
     #table-container { max-height: 70vh; border-radius: 10px; }
     th, td { min-width: 36px !important; font-size: 0.72rem; }
-    .name-cell  { min-width: 90px !important; max-width: 110px !important; }
+    .name-cell  { min-width: 110px !important; max-width: 110px !important; }
     .serial-cell { min-width: 32px !important; max-width: 32px !important; width: 32px !important; font-size: 0.65rem; }
 
     /* Inputs */
@@ -607,10 +607,10 @@ input[type=number]::-webkit-inner-spin-button {
 }
 
 @media (max-width: 480px) {
-    th, td { min-width: 30px !important; font-size: 0.62rem; }
-    .name-cell  { min-width: 80px !important; max-width: 95px !important; }
+    th, td { min-width: 33px !important; font-size: 0.72rem; }
+    .name-cell  { min-width: 110px !important; max-width: 110px !important; }
     .serial-cell { min-width: 26px !important; max-width: 26px !important; width: 26px !important; }
-    .meal-input { height: 28px; font-size: 0.65rem; }
+    .meal-input { height: 32px; font-size: 0.72rem; }
     .sticky-header { font-size: 0.55rem; }
     #table-container { max-height: 65vh; }
 }
