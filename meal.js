@@ -378,10 +378,10 @@ function updateTotal(pi) {
     const cell = document.getElementById(`total-display-${pi}`);
     if (cell) {
         cell.innerHTML = `
-            <div class="p-2" style="min-width:82px;">
-                <div class="total-cell-tm flex justify-between gap-3"><span>Real:</span><span>${formatNumber(tm)}</span></div>
-                <div class="total-cell-gm flex justify-between gap-3"><span>Guest:</span><span>${formatNumber(gm)}</span></div>
-                <div class="total-cell-combined flex justify-between gap-3"><span>T:M:</span><span>${formatNumber(tc)}</span></div>
+            <div class="p-2" style="min-width:75px;">
+                <div class="total-cell-tm flex justify-between gap-2"><span>Real:</span><span>${formatNumber(tm)}</span></div>
+                <div class="total-cell-gm flex justify-between gap-2"><span>Guest:</span><span>${formatNumber(gm)}</span></div>
+                <div class="total-cell-combined flex justify-between gap-2"><span>T:M:</span><span>${formatNumber(tc)}</span></div>
             </div>`;
     }
     updateGrandTotal();
