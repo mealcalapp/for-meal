@@ -261,7 +261,8 @@ function createMealInput(personIndex, dayIndex, type, value, locked) {
     input.dataset.day    = String(dayIndex);
     input.dataset.type   = type;
     input.value = value===0 ? "" : formatNumber(value);
-    input.disabled = locked || isReadOnlyForUser();
+    // Only manager can ever edit — everyone else is always locked
+    input.disabled = !isManagerMode || locked || isReadOnlyForUser();
     if (input.disabled) input.classList.add("locked-input");
     input.addEventListener("change", handleMealInputChange);
     return input;
@@ -292,7 +293,7 @@ function renderTableBody() {
         nameInput.placeholder = defaultName;
         nameInput.value = person.name.startsWith("Member ") ? "" : person.name;
         nameInput.dataset.person = String(pi);
-        nameInput.disabled = (person.nameLocked && !isManagerMode) || isReadOnlyForUser();
+        nameInput.disabled = !isManagerMode || isReadOnlyForUser();
         if (nameInput.disabled) nameInput.classList.add("locked-input");
         nameInput.addEventListener("change", handleNameInputChange);
         nameCell.appendChild(nameInput);
@@ -577,30 +578,26 @@ async function openMonth(date) {
 
 // ── Event handlers ────────────────────────────────────────────
 async function handleNameInputChange(event) {
-    if (isReadOnlyForUser()) return;
+    if (!isManagerMode || isReadOnlyForUser()) return;
     const input = event.target;
     const pi    = parseInt(input.dataset.person,10);
     const member = mealData[pi];
     if (!member) return;
 
-    if (member.nameLocked && !isManagerMode) { input.value = member.name; input.disabled=true; return; }
-
     const value = input.value.trim();
-    if (!value && !isManagerMode) return;
-
-    if (!value && isManagerMode) {
+    if (!value) {
         member.name = `Member ${pi+1}`;
         member.nameLocked = false;
     } else {
         member.name = value;
-        if (!isManagerMode) member.nameLocked = true;
+        member.nameLocked = true;
     }
     await saveMonthData(true);
     renderTable();
 }
 
 async function handleMealInputChange(event) {
-    if (isReadOnlyForUser()) return;
+    if (!isManagerMode || isReadOnlyForUser()) return;
     const input = event.target;
     const pi    = parseInt(input.dataset.person,10);
     const di    = parseInt(input.dataset.day,10);
@@ -611,16 +608,17 @@ async function handleMealInputChange(event) {
     const lockArr   = type==="meal" ? member.mealLocked : member.guestMealLocked;
     const targetArr = type==="meal" ? member.meals      : member.guestMeals;
 
-    if (lockArr[di] && !isManagerMode) { input.disabled=true; return; }
-
     const raw = input.value.trim();
     if (!raw) {
-        if (isManagerMode) { targetArr[di]=0; lockArr[di]=false; await saveMonthData(false); updateTotal(pi); }
+        targetArr[di] = 0;
+        lockArr[di]   = false;
+        await saveMonthData(false);
+        updateTotal(pi);
         return;
     }
 
     targetArr[di] = parseInput(raw);
-    if (!isManagerMode) lockArr[di] = true;
+    lockArr[di]   = true;
     await saveMonthData(false);
     updateTotal(pi);
 }
