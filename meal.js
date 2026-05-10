@@ -244,7 +244,7 @@ function renderTableHeader() {
 
     for (let d=1; d<=selectedMonthDays; d++) {
         const isToday = isCurrentMonthView() && d===today;
-        row.insertCell().outerHTML = `<th class="sticky-header text-center p-2${isToday?' today-col':''}">${d}${isToday?'<br><span style="font-size:0.55rem;opacity:0.8">TODAY</span>':''}</th>`;
+        row.insertCell().outerHTML = `<th class="sticky-header text-center p-2${isToday?' today-col':''}">${d}${isToday?'<br><span class="today-label">TODAY</span>':''}</th>`;
     }
 
     row.insertCell().outerHTML = '<th class="sticky-col-right sticky-header text-center p-2" style="min-width:90px;">Total<br><span id="grand-total" class="font-bold text-cyan-300">0</span></th>';
@@ -338,7 +338,7 @@ function renderTableBody() {
     lCell.style.color="#f8fafc";
     lCell.style.fontWeight="700";
     lCell.style.padding="10px 16px";
-    lCell.textContent = "Grand Total (Billing)";
+    lCell.textContent = "Total Meals";
 
     for (let d=0; d<selectedMonthDays; d++) {
         const c = grandRow.insertCell();
@@ -381,7 +381,7 @@ function updateTotal(pi) {
             <div class="p-2" style="min-width:82px;">
                 <div class="total-cell-tm flex justify-between gap-3"><span>Real:</span><span>${formatNumber(tm)}</span></div>
                 <div class="total-cell-gm flex justify-between gap-3"><span>Guest:</span><span>${formatNumber(gm)}</span></div>
-                <div class="total-cell-combined flex justify-between gap-3"><span>Bill:</span><span>${formatNumber(tc)}</span></div>
+                <div class="total-cell-combined flex justify-between gap-3"><span>T:M:</span><span>${formatNumber(tc)}</span></div>
             </div>`;
     }
     updateGrandTotal();
@@ -700,7 +700,7 @@ async function handleGoogleSignIn() {
             // Different manager already registered
             await firebase.auth().signOut();
             currentUser = null;
-            showAuthError("Manager slot taken for this month by another account.");
+            showAuthError("Manager is already set for this month by another account.");
             updateManagerUI();
         }
     } catch(e) {

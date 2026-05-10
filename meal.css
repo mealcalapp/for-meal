@@ -517,11 +517,102 @@ input[type=number]::-webkit-inner-spin-button {
 
 @keyframes spin { to { transform: rotate(360deg); } }
 
+.today-label {
+    display: block;
+    font-size: 0.52rem;
+    opacity: 0.8;
+    letter-spacing: 0.03em;
+}
+
 /* ── RESPONSIVE ─────────────────────────────────────────────── */
+
+/* Smooth touch scrolling */
+#table-container {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+}
+
+/* Scroll shadow hint so user knows table is scrollable */
+#table-container {
+    background:
+        linear-gradient(to right, white 20px, transparent 20px),
+        linear-gradient(to left,  white 20px, transparent 20px) right,
+        radial-gradient(ellipse at left,  rgba(0,0,0,0.10) 0%, transparent 70%) left,
+        radial-gradient(ellipse at right, rgba(0,0,0,0.10) 0%, transparent 70%) right;
+    background-color: white;
+    background-repeat: no-repeat;
+    background-size: 20px 100%, 20px 100%, 14px 100%, 14px 100%;
+    background-attachment: local, local, scroll, scroll;
+}
+
 @media (max-width: 768px) {
-    .name-cell { min-width: 100px; }
-    th, td { min-width: 40px; }
-    .total-cell-tm, .total-cell-gm, .total-cell-combined { font-size: 0.72rem; }
+    body { padding: 10px !important; }
+
+    /* Header */
+    .premium-header { padding: 14px 12px !important; border-radius: 14px; }
+    .premium-header h1 { font-size: 1.4rem !important; }
+    .premium-header p { font-size: 0.72rem !important; }
+
+    /* Glass panel — stack vertically */
+    .header-glass-panel { padding: 10px; border-radius: 12px; }
+    .header-glass-panel > div {
+        flex-direction: column !important;
+        gap: 8px !important;
+        align-items: stretch !important;
+    }
+    .header-glass-panel .flex.items-center.gap-2 {
+        justify-content: space-between;
+        width: 100%;
+    }
+    .header-label { font-size: 0.7rem; }
+    .header-control { font-size: 0.8rem; }
+
+    /* Action buttons */
+    .mt-3.flex.flex-wrap { gap: 6px !important; }
+    .header-chip { font-size: 0.72rem; padding: 5px 10px; }
+    .google-btn  { font-size: 0.75rem; padding: 6px 12px; }
+
+    /* Table */
+    #table-container { max-height: 70vh; border-radius: 10px; }
+    th, td { min-width: 36px !important; font-size: 0.72rem; }
+    .name-cell  { min-width: 90px !important; max-width: 110px !important; }
+    .serial-cell { min-width: 32px !important; max-width: 32px !important; width: 32px !important; font-size: 0.65rem; }
+
+    /* Inputs */
+    .meal-input { height: 32px; font-size: 0.72rem; padding: 0; }
+    .name-input { padding: 5px 6px !important; font-size: 0.75rem; }
+
+    /* Totals */
+    .total-cell-tm, .total-cell-gm { font-size: 0.65rem; }
+    .total-cell-combined { font-size: 0.72rem; padding-top: 4px; margin-top: 2px; }
+    #table-container td[id^="total-display"] > div { min-width: 68px; padding: 4px; }
+
+    /* Header row */
+    .sticky-header { font-size: 0.62rem; padding: 5px 2px !important; }
+    .grand-total-row td { padding: 8px; font-size: 0.72rem; }
+
+    /* Panels */
+    .notes-panel, .bazar-panel { border-radius: 12px; margin-top: 12px; }
+    .notes-toolbar, .bazar-toolbar { padding: 10px 14px; }
+    .notes-editor, .bazar-editor { font-size: 14px; padding: 14px 14px 18px; min-height: 180px; }
+
+    /* FAB — icon only */
+    #floatingButton { bottom: 16px; right: 12px; padding: 12px 14px; }
+    #floatingButton span { display: none !important; }
+
+    /* Toast */
+    #toast { min-width: 150px; font-size: 0.82rem; padding: 10px 16px; bottom: 72px; }
+
+    #monthMarquee { font-size: 0.78rem; }
+}
+
+@media (max-width: 480px) {
+    th, td { min-width: 30px !important; font-size: 0.62rem; }
+    .name-cell  { min-width: 80px !important; max-width: 95px !important; }
+    .serial-cell { min-width: 26px !important; max-width: 26px !important; width: 26px !important; }
+    .meal-input { height: 28px; font-size: 0.65rem; }
+    .sticky-header { font-size: 0.55rem; }
+    #table-container { max-height: 65vh; }
 }
 
 /* ── MANAGER MODE INDICATOR ─────────────────────────────────── */
