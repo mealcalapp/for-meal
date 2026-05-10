@@ -3,179 +3,168 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Monthly Meal Register App</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
-    <link rel="stylesheet" href="./flip.css">
-    <link rel="stylesheet" href="./meal.css">
-    <!-- Load Tailwind CSS -->
+    <title>Monthly Meal Register</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        #floatingButton {
-            z-index: 100;
-            border-radius: 9999px;
-            color: #ffffff;
-            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 45%, #06b6d4 100%);
-            border: 1px solid rgba(255, 255, 255, 0.35);
-            box-shadow: 0 14px 28px rgba(30, 58, 138, 0.35), 0 8px 16px rgba(2, 6, 23, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.35);
-            transition: transform 0.25s ease, box-shadow 0.25s ease, filter 0.25s ease;
-        }
-
-        #floatingButton:hover {
-            transform: translateY(-2px) scale(1.03);
-            filter: saturate(1.15);
-            box-shadow: 0 18px 30px rgba(30, 58, 138, 0.4), 0 10px 20px rgba(2, 6, 23, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.35);
-        }
-    </style>
-    <!-- Custom configuration for Tailwind -->
+    <link rel="stylesheet" href="./meal.css">
+    <link rel="stylesheet" href="./flip.css">
     <script>
         tailwind.config = {
             theme: {
                 extend: {
-                    fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
-                    },
-                    colors: {
-                        'primary-blue': '#3B82F6',
-                        'light-gray': '#F9FAFB',
-                        'border-subtle': '#E5E7EB',
-                    }
+                    fontFamily: { sans: ['DM Sans', 'sans-serif'] }
                 }
             }
         }
     </script>
-    
 </head>
 <body class="p-4 md:p-8">
 
-    <!-- Header Section -->
-    <header class="premium-header mb-6 md:mb-8 text-center p-5 md:p-6 rounded-2xl">
-        <div class="premium-header-content">
-        <h1 id="month-header" class="text-3xl md:text-4xl font-extrabold text-white tracking-tight drop-shadow-sm">
-            <!-- Dynamic Month and Year will be injected here -->
-        </h1>
-        <p class="text-sm text-blue-100 mt-1">Real-time monthly Meal Register</p>
-        
+<!-- Skeleton Loader -->
+<div id="skeleton-overlay">
+    <div class="skeleton-card">
+        <div class="skeleton-spinner"></div>
+        <p class="text-slate-600 font-semibold text-sm">Loading Meal Register…</p>
+    </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<!-- HEADER -->
+<header class="premium-header mb-6 md:mb-8 text-center p-5 md:p-7 rounded-2xl">
+    <div class="premium-header-content">
+        <h1 id="month-header" class="text-3xl md:text-4xl font-extrabold text-white tracking-tight drop-shadow"></h1>
+        <p class="text-sm text-blue-200 mt-1 font-medium">Real-time Monthly Meal Register</p>
+
         <div class="header-glass-panel mt-4">
             <div class="flex flex-wrap justify-center items-center gap-3">
-                <div style="display:flex; flex-direction:column; gap:10px; align-items:center;">
 
-                    <div style="display:flex; align-items:center; gap:10px;">
-                        <label for="manager-name-input" class="header-label">Manager Name</label>
-                        <input
-                            type="text"
-                            id="manager-name-input"
-                            class="header-control w-28 p-1.5 text-sm"
-                            placeholder="Manager"
-                        >
-                    </div>
+                <!-- Manager Name -->
+                <div class="flex items-center gap-2">
+                    <label for="manager-name-input" class="header-label">Manager</label>
+                    <input type="text" id="manager-name-input" class="header-control w-28 p-1.5 text-sm" placeholder="Name">
+                </div>
 
-                    <div id="manager-only-history" style="display:flex; align-items:center; gap:10px;">
-                        <label for="month-selector" class="header-label">History</label>
-                        <select
-                            id="month-selector"
-                            class="header-control p-1"
-                        ></select>
-                    </div>
+                <!-- History -->
+                <div id="history-control" class="flex items-center gap-2">
+                    <label for="month-selector" class="header-label">History</label>
+                    <select id="month-selector" class="header-control p-1.5 text-sm"></select>
+                </div>
 
-                    <div style="display:flex; align-items:center; gap:10px;">
-                        <label for="fixed-meal-input" class="header-label">Fixed Meal</label>
-                        <input
-                            type="number"
-                            id="fixed-meal-input"
-                            class="header-control w-11 p-1.5 text-center"
-                            min="0"
-                            value="60"
-                        >
-                    </div>
-                    <div id="manager-only-total-members" class="manager-only-control hidden flex items-center gap-2">
+                <!-- Fixed Meal (manager only) -->
+                <div class="flex items-center gap-2">
+                    <label for="fixed-meal-input" class="header-label">Fixed Meal</label>
+                    <input type="number" id="fixed-meal-input" class="header-control w-14 p-1.5 text-center text-sm" min="0" value="60">
+                    <button id="fixed-meal-save-btn" class="hidden px-3 py-1.5 text-xs font-bold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors shadow">Set</button>
+                </div>
+
+                <!-- Members (manager only) -->
+                <div id="manager-only-total-members" class="hidden flex items-center gap-2">
                     <label for="total-members-input" class="header-label">Members</label>
-                    <input
-                        type="number"
-                        id="total-members-input"
-                        class="header-control w-11 p-2 text-center"
-                        min="1"
-                        max="999"
-                        value="20"
-                    >
+                    <input type="number" id="total-members-input" class="header-control w-14 p-1.5 text-center text-sm" min="1" max="999" value="20">
                 </div>
 
-                </div>
-                <button id="fixed-meal-save-btn" class="px-3 py-2 text-sm font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 shadow-lg shadow-indigo-900/30">Set</button>
             </div>
         </div>
 
+        <!-- Action buttons row -->
         <div class="mt-3 flex flex-wrap justify-center items-center gap-2">
             <span id="manager-mode-indicator" class="header-chip text-sm"></span>
-            <button id="bazar-toggle-btn" class="bazar-toggle-btn px-3 py-2 text-sm font-semibold text-white rounded-lg hover:bg-white/25">Bazar Cost</button>
-            <button id="note-toggle-btn" class="note-toggle-btn px-3 py-2 text-sm font-semibold text-white rounded-lg hover:bg-white/25">Additional Cost</button>
-            <button id="manager-login-btn" class="px-3 py-2 text-sm font-semibold text-white bg-slate-900/75 border border-white/30 rounded-lg hover:bg-slate-900">Manager Login</button>
-            <button id="manager-logout-btn" class="px-3 py-2 text-sm font-semibold text-white bg-rose-600 rounded-lg hover:bg-rose-700 hidden">Manager Logout</button>
+
+            <button id="bazar-toggle-btn" class="bazar-toggle-btn px-3 py-1.5 text-sm font-semibold text-white rounded-lg">
+                <i class="fas fa-shopping-basket mr-1"></i>Bazar Cost
+            </button>
+            <button id="note-toggle-btn" class="note-toggle-btn px-3 py-1.5 text-sm font-semibold text-white rounded-lg">
+                <i class="fas fa-sticky-note mr-1"></i>Additional Cost
+            </button>
+
+            <!-- Google Sign-in button -->
+            <button id="google-signin-btn" class="google-btn">
+                <svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                    <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+                    <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+                    <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+                    <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.36-8.16 2.36-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+                    <path fill="none" d="M0 0h48v48H0z"/>
+                </svg>
+                Sign in as Manager
+            </button>
+
+            <button id="manager-logout-btn" class="hidden px-3 py-1.5 text-sm font-semibold text-white bg-rose-600 rounded-lg hover:bg-rose-700 transition-colors">
+                <i class="fas fa-sign-out-alt mr-1"></i>Logout
+            </button>
         </div>
-        <div id="manager-login-panel" class="mt-3 flex flex-wrap justify-center items-center gap-2 hidden">
-            <input type="password" id="manager-password" class="header-control w-40 p-2 text-sm" placeholder="Manager password">
-            <button id="manager-submit-btn" class="px-3 py-2 text-sm font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700">Login</button>
-        </div>
-        </div>
-    </header>
-    
-    <div id="message-box-container" class="relative w-full mb-4">
-        <div id="message-box" class="mx-auto w-full md:w-1/2 bg-green-500 text-white p-3 rounded-lg shadow-xl text-center hidden transition-all duration-300 transform opacity-0">
-            Saved!
+
+        <!-- Auth error message -->
+        <div id="auth-error" class="mt-2 hidden justify-center">
+            <span class="auth-error-chip"><i class="fas fa-exclamation-circle"></i><span id="auth-error-text"></span></span>
         </div>
     </div>
+</header>
 
+<!-- TABLE -->
+<div id="table-container" class="w-full">
+    <table id="meal-register-table" class="min-w-full border-collapse text-sm"></table>
+</div>
 
-    <!-- Table Container -->
-    <div id="table-container" class="w-full">
-        <table id="meal-register-table" class="min-w-full border-collapse border border-border-subtle text-sm">
-            <!-- Table content will be generated by JavaScript -->
-        </table>
+<!-- BAZAR PANEL -->
+<section id="bazar-panel" class="bazar-panel">
+    <div class="bazar-toolbar">
+        <div>
+            <div class="bazar-title"><i class="fas fa-shopping-basket mr-2"></i>Bazar Cost</div>
+            <div class="bazar-hint">Only Manager can edit</div>
+        </div>
+        <button class="panel-close-btn" id="bazar-close-btn" title="Close">✕</button>
     </div>
-    <section id="bazar-panel" class="bazar-panel">
-        <div class="bazar-toolbar">
-            <div>
-                <div class="bazar-title">Bazar Cost</div>
-                <div class="bazar-hint">Only Manager can edit</div>
-            </div>
-        </div>
-        <textarea id="bazar-editor" class="bazar-editor" placeholder="Write bazar cost here..."></textarea>
-    </section>
-    <section id="notes-panel" class="notes-panel">
-        <div class="notes-toolbar">
-            <div>
-                <div class="notes-title">Additional Costs</div>
-                <div class="notes-hint">Only Manager can edit</div>
-            </div>
-        </div>
-        <textarea id="notes-editor" class="notes-editor" placeholder="Write notes here..."></textarea>
-    </section>
-  <div class="notice-box mb-2">
-    <marquee id="monthMarquee" style="color: #699ef5;padding: 5px;border-radius: 5px;border:1px solid #699ef5;margin-top: 5px;" behavior="scroll"><!-- Text will appear here --></marquee>
-  </div>
-  <div class="text-center">
-      <div id="flipdownTimer" class="flipdown d-inline-block"></div>
-  </div>
+    <textarea id="bazar-editor" class="bazar-editor" placeholder="Write bazar costs here… (lines ending with = auto-calculate)"></textarea>
+</section>
 
-<!-- Floating Button -->
-    <button id="floatingButton"
-        class="fixed bottom-10 right-4 px-3 py-2 font-semibold flex items-center space-x-2 shadow-2xl">
-        <i class="fas fa-calculator text-lg"></i>
-        <span class="hidden md:inline">Meal Calculator</span>
-    </button>
-    <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-analytics-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-database-compat.js"></script>
-    <script src="./meal.js"></script>
-    <script src="https://cdn.jsdelivr.net/gh/mealcalapp/for-all/flip.js"></script>
-    <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
-    <div style="text-align:center; margin-top:20px; font-size:13px; color:#555;">
-    <span style="font-size:18px; vertical-align:middle;">&copy;</span>
-    <a href="https://saniatkajoljisan.github.io/skjisan/" target="_blank" style="color:#3182ce; font-weight:bold; text-decoration:none; margin:0 1px; vertical-align:middle;">SK JISAN</a>
+<!-- NOTES PANEL -->
+<section id="notes-panel" class="notes-panel">
+    <div class="notes-toolbar">
+        <div>
+            <div class="notes-title"><i class="fas fa-sticky-note mr-2"></i>Additional Costs</div>
+            <div class="notes-hint">Only Manager can edit</div>
+        </div>
+        <button class="panel-close-btn" id="notes-close-btn" title="Close">✕</button>
+    </div>
+    <textarea id="notes-editor" class="notes-editor" placeholder="Write additional costs here… (lines ending with = auto-calculate)"></textarea>
+</section>
+
+<!-- MARQUEE -->
+<div class="mt-4">
+    <marquee id="monthMarquee" style="color:#699ef5;padding:5px;border-radius:5px;border:1px solid #699ef5;margin-top:5px;"></marquee>
+</div>
+
+<!-- FLIP TIMER -->
+<div class="text-center mt-2">
+    <div id="flipdownTimer" class="flipdown d-inline-block"></div>
+</div>
+
+<!-- FOOTER -->
+<div style="text-align:center;margin-top:20px;font-size:13px;color:#64748b;">
+    <span style="font-size:16px;vertical-align:middle;">&copy;</span>
+    <a href="https://saniatkajoljisan.github.io/skjisan/" target="_blank" style="color:#3b82f6;font-weight:700;text-decoration:none;margin:0 4px;vertical-align:middle;">SK JISAN</a>
     <span id="currentYear" style="vertical-align:middle;"></span>
-    </div>
-    <script>
-        document.getElementById('currentYear').textContent = new Date().getFullYear();
-    </script>
+</div>
 
+<!-- FAB -->
+<button id="floatingButton" class="fixed bottom-10 right-4 px-4 py-2.5 font-semibold flex items-center gap-2 shadow-2xl">
+    <i class="fas fa-calculator text-lg"></i>
+    <span class="hidden md:inline text-sm">Meal Calculator</span>
+</button>
+
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-analytics-compat.js"></script>
+<script src="./meal.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/mealcalapp/for-all/flip.js"></script>
+<script>
+    document.getElementById('currentYear').textContent = new Date().getFullYear();
+</script>
 </body>
 </html>
