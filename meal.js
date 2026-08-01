@@ -27,7 +27,7 @@ const MAX_DAYS = 31;
 // enforcement (so no one can fake it via devtools) should live in
 // Firebase Realtime Database Security Rules — see note at bottom
 // of this file / chat.
-const SUPER_ADMIN_EMAIL = "katunnahida8@gmail.com"; // <-- put your Gmail here
+const SUPER_ADMIN_EMAIL = "your.email@gmail.com"; // <-- put your Gmail here
 
 // ── DOM refs ─────────────────────────────────────────────────
 const table               = document.getElementById("meal-register-table");
@@ -59,7 +59,7 @@ let isFirebaseMode     = false;
 let monthDocRef        = null;
 let unsubscribeMonth   = null;
 
-let numPeople          = 15;
+let numPeople          = 20;
 let fixedMeal          = 60;
 let mealData           = [];
 let isManagerMode      = false;
@@ -738,26 +738,26 @@ async function handleGoogleSignIn() {
             return;
         }
 
-        // Check current month's managerEmail in Firebase
+        // Check current month's managerEmail in Firebase — done as an atomic
+        // transaction so two people signing in at nearly the same moment can't
+        // both "win" (a plain read-then-write has that race).
         const monthKey = getMonthKey(monthStart(new Date()));
-        const snap     = await db.ref(`${COLLECTION_NAME}/${monthKey}/managerEmail`).once("value");
-        const existingEmail = snap.val()||"";
+        const managerRef = db.ref(`${COLLECTION_NAME}/${monthKey}/managerEmail`);
 
-        if (!existingEmail) {
-            // First manager for this month — register
+        const tx = await managerRef.transaction(current => {
+            if (!current) return user.email;            // nobody manages this month yet — claim it
+            if (current === user.email) return current;  // already you — no-op re-login
+            return; // someone else already manages this month — abort, don't touch it
+        });
+
+        const finalEmail = tx.snapshot.val() || "";
+
+        if (finalEmail === user.email) {
             storedManagerEmail = user.email;
-            await db.ref(`${COLLECTION_NAME}/${monthKey}/managerEmail`).set(user.email);
             currentUser = user;
             computeManagerMode();
             updateManagerUI();
             showMessage(`Welcome, Manager ${user.displayName||user.email}!`);
-        } else if (existingEmail === user.email) {
-            // Re-login as same manager
-            storedManagerEmail = existingEmail;
-            currentUser = user;
-            computeManagerMode();
-            updateManagerUI();
-            showMessage(`Welcome back, ${user.displayName||user.email}!`);
         } else {
             // Different manager already registered
             await firebase.auth().signOut();
@@ -781,27 +781,34 @@ async function handleReleaseManager() {
     );
     if (!ok) return;
 
-    storedManagerEmail = "";
-
-    if (db) {
-        await db.ref(`${COLLECTION_NAME}/${monthKey}/managerEmail`).set("");
-    } else {
-        const store = readLocalStore();
-        if (store[monthKey]) {
-            store[monthKey].managerEmail = "";
-            writeLocalStore(store);
+    try {
+        if (db) {
+            // remove() (not set("")) so the field is truly gone — an empty
+            // string can still "exist" and confuse later existence checks.
+            await db.ref(`${COLLECTION_NAME}/${monthKey}/managerEmail`).remove();
+        } else {
+            const store = readLocalStore();
+            if (store[monthKey]) {
+                delete store[monthKey].managerEmail;
+                writeLocalStore(store);
+            }
         }
-    }
 
-    if (!isSuperAdmin()) {
-        // A regular manager is giving up their own role — sign them out too
-        await firebase.auth().signOut();
-        currentUser = null;
-    }
+        storedManagerEmail = "";
 
-    computeManagerMode();
-    updateManagerUI();
-    showMessage(`Manager removed for ${label}. Waiting for a new sign-in.`);
+        if (!isSuperAdmin()) {
+            // A regular manager is giving up their own role — sign them out too
+            await firebase.auth().signOut();
+            currentUser = null;
+        }
+
+        computeManagerMode();
+        updateManagerUI();
+        showMessage(`Manager removed for ${label}. Waiting for a new sign-in.`);
+    } catch(e) {
+        console.error(e);
+        showMessage(e.message || "Failed to remove manager", true);
+    }
 }
 
 async function handleManagerLogout() {
@@ -918,11 +925,24 @@ async function boot() {
             return;
         }
 
-        // Wait for Firebase Auth state before rendering
+        // Wait for Firebase Auth state before rendering.
+        // IMPORTANT: this listener stays alive for the whole session (Firebase
+        // never lets you "unsubscribe once and forget" safely) — so every time
+        // auth state changes later (sign-in, sign-out, token refresh), we must
+        // re-sync isManagerMode and re-render. Previously this only happened on
+        // the very first call, so a later silent auth change could leave the UI
+        // showing stale manager controls while currentUser had already changed.
+        let firstAuthEventHandled = false;
         await new Promise(resolve => {
-            firebase.auth().onAuthStateChanged(async user => {
+            firebase.auth().onAuthStateChanged(user => {
                 currentUser = user || null;
-                resolve();
+                if (!firstAuthEventHandled) {
+                    firstAuthEventHandled = true;
+                    resolve();
+                } else {
+                    computeManagerMode();
+                    updateManagerUI();
+                }
             });
         });
 
