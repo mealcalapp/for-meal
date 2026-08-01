@@ -27,7 +27,7 @@ const MAX_DAYS = 31;
 // enforcement (so no one can fake it via devtools) should live in
 // Firebase Realtime Database Security Rules — see note at bottom
 // of this file / chat.
-const SUPER_ADMIN_EMAIL = "your.email@gmail.com"; // <-- put your Gmail here
+const SUPER_ADMIN_EMAIL = "katunnahida8@gmail.com"; // <-- put your Gmail here
 
 // ── DOM refs ─────────────────────────────────────────────────
 const table               = document.getElementById("meal-register-table");
@@ -59,7 +59,7 @@ let isFirebaseMode     = false;
 let monthDocRef        = null;
 let unsubscribeMonth   = null;
 
-let numPeople          = 20;
+let numPeople          = 15;
 let fixedMeal          = 60;
 let mealData           = [];
 let isManagerMode      = false;
