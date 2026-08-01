@@ -48,6 +48,7 @@ const notesPanel          = document.getElementById("notes-panel");
 const notesEditor         = document.getElementById("notes-editor");
 const googleSigninBtn     = document.getElementById("google-signin-btn");
 const managerLogoutBtn    = document.getElementById("manager-logout-btn");
+const changeManagerBtn    = document.getElementById("change-manager-btn");
 const authError           = document.getElementById("auth-error");
 const authErrorText       = document.getElementById("auth-error-text");
 const skeletonOverlay     = document.getElementById("skeleton-overlay");
@@ -58,7 +59,7 @@ let isFirebaseMode     = false;
 let monthDocRef        = null;
 let unsubscribeMonth   = null;
 
-let numPeople          = 14;
+let numPeople          = 20;
 let fixedMeal          = 60;
 let mealData           = [];
 let isManagerMode      = false;
@@ -190,6 +191,7 @@ function updateManagerUI() {
         googleSigninBtn.classList.remove("hidden");
         managerLogoutBtn.classList.add("hidden");
     }
+    if (changeManagerBtn) changeManagerBtn.classList.toggle("hidden", !isManager);
 
     // Mode indicator
     const photoHTML = currentUser?.photoURL
@@ -769,6 +771,39 @@ async function handleGoogleSignIn() {
     }
 }
 
+async function handleReleaseManager() {
+    if (!isManagerMode) return;
+    const monthKey = getMonthKey(selectedMonthDate);
+    const label = getMonthLabel(selectedMonthDate);
+
+    const ok = window.confirm(
+        `Remove the current manager for ${label}?\n\nAfter this, the next person who signs in with Google (with a different Gmail) will become the manager for this month.`
+    );
+    if (!ok) return;
+
+    storedManagerEmail = "";
+
+    if (db) {
+        await db.ref(`${COLLECTION_NAME}/${monthKey}/managerEmail`).set("");
+    } else {
+        const store = readLocalStore();
+        if (store[monthKey]) {
+            store[monthKey].managerEmail = "";
+            writeLocalStore(store);
+        }
+    }
+
+    if (!isSuperAdmin()) {
+        // A regular manager is giving up their own role — sign them out too
+        await firebase.auth().signOut();
+        currentUser = null;
+    }
+
+    computeManagerMode();
+    updateManagerUI();
+    showMessage(`Manager removed for ${label}. Waiting for a new sign-in.`);
+}
+
 async function handleManagerLogout() {
     try {
         await firebase.auth().signOut();
@@ -806,6 +841,12 @@ function bindEvents() {
     managerLogoutBtn.addEventListener("click", ()=>{
         handleManagerLogout().catch(err=>{ console.error(err); showMessage("Logout error",true); });
     });
+
+    if (changeManagerBtn) {
+        changeManagerBtn.addEventListener("click", ()=>{
+            handleReleaseManager().catch(err=>{ console.error(err); showMessage("Failed to change manager",true); });
+        });
+    }
 
     if (managerNameInput) {
         managerNameInput.addEventListener("change", ()=>{
