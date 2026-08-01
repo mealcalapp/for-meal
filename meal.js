@@ -58,7 +58,7 @@ let isFirebaseMode     = false;
 let monthDocRef        = null;
 let unsubscribeMonth   = null;
 
-let numPeople          = 20;
+let numPeople          = 14;
 let fixedMeal          = 60;
 let mealData           = [];
 let isManagerMode      = false;
