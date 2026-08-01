@@ -474,7 +474,11 @@ function buildPayload() {
         memberCount:   numPeople,
         fixedMeal,
         managerName:   (managerNameInput?.value||"").trim(),
-        managerEmail:  storedManagerEmail,
+        // null (not "") so Firebase actually OMITS the key when there's no
+        // manager — an empty string would still "exist" and trip up the
+        // !data.child('managerEmail').exists() check in the security rules,
+        // exactly like the bug set("") caused elsewhere.
+        managerEmail:  storedManagerEmail || null,
         bazarCost:     bazarCostText,
         note:          monthNote,
         members:       mealData,
@@ -923,6 +927,16 @@ async function boot() {
             updateManagerUI();
             hideSkeleton();
             return;
+        }
+
+        // Keep the user (super admin or manager) signed in across page
+        // reloads / browser restarts until they explicitly log out. This is
+        // Firebase's default on web, but we set it explicitly so it never
+        // silently falls back to SESSION/NONE.
+        try {
+            await firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+        } catch(e) {
+            console.error("setPersistence failed", e);
         }
 
         // Wait for Firebase Auth state before rendering.
