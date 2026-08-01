@@ -191,7 +191,7 @@ function updateManagerUI() {
         googleSigninBtn.classList.remove("hidden");
         managerLogoutBtn.classList.add("hidden");
     }
-    if (changeManagerBtn) changeManagerBtn.classList.toggle("hidden", !isManager);
+    if (changeManagerBtn) changeManagerBtn.classList.toggle("hidden", !isSuperAdmin());
 
     // Mode indicator
     const photoHTML = currentUser?.photoURL
@@ -250,9 +250,37 @@ function renderNotes() {
 
 // ── Table rendering ───────────────────────────────────────────
 function renderTable() {
+    // Capture what the user is actively typing in, so a table rebuild
+    // triggered by a remote update (their own save echoing back, or the
+    // other manager/admin's edit) doesn't kick them out of the field.
+    const active = document.activeElement;
+    let focusInfo = null;
+    if (active && table.contains(active) && active.tagName === "INPUT") {
+        focusInfo = {
+            value:    active.value,
+            selStart: active.selectionStart,
+            selEnd:   active.selectionEnd,
+            person:   active.dataset.person,
+            day:      active.dataset.day,
+            type:     active.dataset.type,
+            isName:   active.classList.contains("name-input")
+        };
+    }
+
     table.innerHTML = "";
     renderTableHeader();
     renderTableBody();
+
+    if (focusInfo) {
+        const sel = focusInfo.isName
+            ? table.querySelector(`.name-input[data-person="${focusInfo.person}"]`)
+            : table.querySelector(`.meal-input[data-person="${focusInfo.person}"][data-day="${focusInfo.day}"][data-type="${focusInfo.type}"]`);
+        if (sel) {
+            sel.value = focusInfo.value;
+            sel.focus();
+            try { sel.setSelectionRange(focusInfo.selStart, focusInfo.selEnd); } catch(e) {}
+        }
+    }
 }
 
 function renderTableHeader() {
@@ -285,7 +313,7 @@ function createMealInput(personIndex, dayIndex, type, value, locked) {
     // Only manager can ever edit — everyone else is always locked
     input.disabled = !isManagerMode || locked || isReadOnlyForUser();
     if (input.disabled) input.classList.add("locked-input");
-    input.addEventListener("change", handleMealInputChange);
+    input.addEventListener("input", handleMealInputChange);
     return input;
 }
 
@@ -316,7 +344,7 @@ function renderTableBody() {
         nameInput.dataset.person = String(pi);
         nameInput.disabled = !isManagerMode || isReadOnlyForUser();
         if (nameInput.disabled) nameInput.classList.add("locked-input");
-        nameInput.addEventListener("change", handleNameInputChange);
+        nameInput.addEventListener("input", handleNameInputChange);
         nameCell.appendChild(nameInput);
 
         // Meal cells
@@ -467,36 +495,54 @@ function readLocalStore() {
 }
 function writeLocalStore(store) { localStorage.setItem(LOCAL_FALLBACK_KEY,JSON.stringify(store)); }
 
-function buildPayload() {
+// ── Debounce (per-key, so typing in cell A doesn't cancel a pending
+//    save for cell B) ────────────────────────────────────────────
+const debounceTimers = new Map();
+function debounceKeyed(key, fn, waitMs) {
+    if (debounceTimers.has(key)) clearTimeout(debounceTimers.get(key));
+    debounceTimers.set(key, setTimeout(() => { debounceTimers.delete(key); fn(); }, waitMs));
+}
+
+// Everything needed to initialize a brand-new month document.
+// managerEmail is deliberately NOT part of this — it's only ever set via
+// the sign-in claim transaction or the release flow, never via a bulk save.
+function buildInitialFields() {
     return {
         monthKey:      getMonthKey(selectedMonthDate),
         monthLabel:    getMonthLabel(selectedMonthDate),
         memberCount:   numPeople,
         fixedMeal,
         managerName:   (managerNameInput?.value||"").trim(),
-        // null (not "") so Firebase actually OMITS the key when there's no
-        // manager — an empty string would still "exist" and trip up the
-        // !data.child('managerEmail').exists() check in the security rules,
-        // exactly like the bug set("") caused elsewhere.
-        managerEmail:  storedManagerEmail || null,
         bazarCost:     bazarCostText,
         note:          monthNote,
-        members:       mealData,
-        updatedAt:     Date.now()
+        members:       mealData
     };
 }
 
-async function saveMonthData(showFeedback=true) {
+function mergeLocalFields(monthKey, fields) {
+    const store = readLocalStore();
+    store[monthKey] = { ...(store[monthKey]||{}), ...fields };
+    writeLocalStore(store);
+}
+
+// Save ONLY the given fields/paths — never the whole document. This is
+// what makes it safe for the manager and super admin to both be logged in
+// and editing at the same time: two saves a few seconds apart (or even
+// overlapping) only touch the exact paths that changed, via Firebase's
+// multi-location update(), instead of each replacing the entire month
+// document and silently discarding whatever the other person just wrote.
+// Field keys can be nested paths like `members/3/meals/14`.
+async function saveFields(fields, showFeedback=false) {
     if (!isManagerMode) return; // guard: non-managers never write
+    const monthKey = getMonthKey(selectedMonthDate);
+    const payload = { ...fields, updatedAt: Date.now() };
     if (!db) {
-        const key = getMonthKey(selectedMonthDate);
-        const store = readLocalStore();
-        store[key] = buildPayload();
-        writeLocalStore(store);
+        mergeLocalFields(monthKey, payload);
+        if (showFeedback) showMessage("Saved!");
         return;
     }
     if (!monthDocRef) return;
-    await monthDocRef.set(buildPayload());
+    await monthDocRef.update(payload);
     if (showFeedback) showMessage("Saved!");
 }
 
@@ -585,7 +631,7 @@ async function openMonth(date) {
             applyDefaultMonth();
             renderBazarCost(); renderNotes();
             updateManagerUI();
-            await saveMonthData(false);
+            await saveFields(buildInitialFields(), false);
         } else {
             applyMonthData(data);
             computeManagerMode();
@@ -606,7 +652,7 @@ async function openMonth(date) {
             renderBazarCost(); renderNotes();
             updateManagerUI();
             // Only manager can init a new month document
-            if (isManagerMode) await saveMonthData(false);
+            if (isManagerMode) await saveFields(buildInitialFields(), false);
         } else {
             applyMonthData(snap.val()||{});
             computeManagerMode();
@@ -625,7 +671,11 @@ async function openMonth(date) {
 }
 
 // ── Event handlers ────────────────────────────────────────────
-async function handleNameInputChange(event) {
+// Fires on every keystroke (not just on blur), so a name change is saved
+// within ~400ms without the manager needing to click elsewhere. Table is
+// NOT re-rendered here — that would rebuild the input mid-keystroke and
+// kick the manager out of the field they're typing in.
+function handleNameInputChange(event) {
     if (!isManagerMode || isReadOnlyForUser()) return;
     const input = event.target;
     const pi    = parseInt(input.dataset.person,10);
@@ -640,11 +690,19 @@ async function handleNameInputChange(event) {
         member.name = value;
         member.nameLocked = true;
     }
-    await saveMonthData(true);
-    renderTable();
+    debounceKeyed(`name-${pi}`, () => {
+        saveFields({
+            [`members/${pi}/name`]:       member.name,
+            [`members/${pi}/nameLocked`]: member.nameLocked
+        }).catch(err => { console.error(err); showMessage("Name save failed", true); });
+    }, 400);
 }
 
-async function handleMealInputChange(event) {
+// Fires on every keystroke. Local total updates instantly; the actual
+// network save is debounced per-cell (~350ms after the last keystroke) so
+// typing "25" doesn't fire three separate saves, but nothing needs a
+// click or blur to be saved.
+function handleMealInputChange(event) {
     if (!isManagerMode || isReadOnlyForUser()) return;
     const input = event.target;
     const pi    = parseInt(input.dataset.person,10);
@@ -653,22 +711,25 @@ async function handleMealInputChange(event) {
     const member = mealData[pi];
     if (!member) return;
 
-    const lockArr   = type==="meal" ? member.mealLocked : member.guestMealLocked;
-    const targetArr = type==="meal" ? member.meals      : member.guestMeals;
+    const lockKey   = type==="meal" ? "mealLocked" : "guestMealLocked";
+    const targetKey = type==="meal" ? "meals"      : "guestMeals";
 
     const raw = input.value.trim();
     if (!raw) {
-        targetArr[di] = 0;
-        lockArr[di]   = false;
-        await saveMonthData(false);
-        updateTotal(pi);
-        return;
+        member[targetKey][di] = 0;
+        member[lockKey][di]   = false;
+    } else {
+        member[targetKey][di] = parseInput(raw);
+        member[lockKey][di]   = true;
     }
-
-    targetArr[di] = parseInput(raw);
-    lockArr[di]   = true;
-    await saveMonthData(false);
     updateTotal(pi);
+
+    debounceKeyed(`meal-${pi}-${di}-${type}`, () => {
+        saveFields({
+            [`members/${pi}/${targetKey}/${di}`]: member[targetKey][di],
+            [`members/${pi}/${lockKey}/${di}`]:   member[lockKey][di]
+        }).catch(err => { console.error(err); showMessage("Save failed", true); });
+    }, 350);
 }
 
 async function handleTotalMembersChange(event) {
@@ -680,7 +741,7 @@ async function handleTotalMembersChange(event) {
     mealData = Array.from({length:n},(_,i)=>normalizeMember(mealData[i],i));
     numPeople = n;
     renderTable();
-    await saveMonthData(true);
+    await saveFields({ members: mealData, memberCount: numPeople }, true);
 }
 
 async function handleToggleFixedMeal(pi) {
@@ -689,7 +750,7 @@ async function handleToggleFixedMeal(pi) {
     if (!member) return;
     member.fixedMealOff = !member.fixedMealOff;
     updateTotal(pi);
-    await saveMonthData(true);
+    await saveFields({ [`members/${pi}/fixedMealOff`]: member.fixedMealOff }, true);
 }
 
 async function handleFixedMealSave() {
@@ -700,7 +761,7 @@ async function handleFixedMealSave() {
     fixedMeal = v;
     fixedMealInput.value = formatNumber(fixedMeal);
     renderTable();
-    await saveMonthData(true);
+    await saveFields({ fixedMeal }, true);
 }
 
 async function saveNoteText(raw, showFeedback=false) {
@@ -711,7 +772,7 @@ async function saveNoteText(raw, showFeedback=false) {
         notesEditor.value = n;
         if (typeof cur==="number") notesEditor.selectionStart = notesEditor.selectionEnd = Math.min(cur,n.length);
     }
-    await saveMonthData(showFeedback);
+    await saveFields({ note: n }, showFeedback);
 }
 
 async function saveBazarCostText(raw, showFeedback=false) {
@@ -722,7 +783,7 @@ async function saveBazarCostText(raw, showFeedback=false) {
         bazarEditor.value = n;
         if (typeof cur==="number") bazarEditor.selectionStart = bazarEditor.selectionEnd = Math.min(cur,n.length);
     }
-    await saveMonthData(showFeedback);
+    await saveFields({ bazarCost: n }, showFeedback);
 }
 
 // ── Google Auth ───────────────────────────────────────────────
@@ -776,7 +837,7 @@ async function handleGoogleSignIn() {
 }
 
 async function handleReleaseManager() {
-    if (!isManagerMode) return;
+    if (!isSuperAdmin()) return; // only Super Admin can remove a manager now
     const monthKey = getMonthKey(selectedMonthDate);
     const label = getMonthLabel(selectedMonthDate);
 
@@ -799,12 +860,6 @@ async function handleReleaseManager() {
         }
 
         storedManagerEmail = "";
-
-        if (!isSuperAdmin()) {
-            // A regular manager is giving up their own role — sign them out too
-            await firebase.auth().signOut();
-            currentUser = null;
-        }
 
         computeManagerMode();
         updateManagerUI();
@@ -832,6 +887,14 @@ function bindEvents() {
     membersInput.addEventListener("change", e => handleTotalMembersChange(e).catch(err=>{
         console.error(err); showMessage("Member update failed",true);
     }));
+    membersInput.addEventListener("input", () => {
+        if (!isManagerMode || isReadOnlyForUser()) return;
+        debounceKeyed("memberCount", () => {
+            handleTotalMembersChange({ target: membersInput }).catch(err=>{
+                console.error(err); showMessage("Member update failed",true);
+            });
+        }, 500);
+    });
 
     monthSelector.addEventListener("change", async e => {
         const key = e.target.value;
@@ -843,6 +906,12 @@ function bindEvents() {
 
     fixedMealSaveBtn.addEventListener("click", ()=>{
         handleFixedMealSave().catch(err=>{ console.error(err); showMessage("Failed",true); });
+    });
+    fixedMealInput.addEventListener("input", () => {
+        if (!isManagerMode || isReadOnlyForUser()) return;
+        debounceKeyed("fixedMeal", () => {
+            handleFixedMealSave().catch(err=>{ console.error(err); showMessage("Failed",true); });
+        }, 400);
     });
 
     googleSigninBtn.addEventListener("click", ()=>{
@@ -860,9 +929,12 @@ function bindEvents() {
     }
 
     if (managerNameInput) {
-        managerNameInput.addEventListener("change", ()=>{
+        managerNameInput.addEventListener("input", ()=>{
             if (!isManagerMode || isReadOnlyForUser()) return;
-            saveMonthData(true).catch(err=>{ console.error(err); showMessage("Name save failed",true); });
+            const val = managerNameInput.value.trim();
+            debounceKeyed("managerName", ()=>{
+                saveFields({ managerName: val }).catch(err=>{ console.error(err); showMessage("Name save failed",true); });
+            }, 400);
         });
     }
 
