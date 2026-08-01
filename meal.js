@@ -19,6 +19,16 @@ const COLLECTION_NAME = "meal_register";
 const LOCAL_FALLBACK_KEY = "mealRegistersLocalFallback";
 const MAX_DAYS = 31;
 
+// ── Super Admin ──────────────────────────────────────────────
+// No password needed: Google Sign-In already proves this Gmail's
+// owner is signing in (Firebase verifies it). We just check the
+// verified email against this constant. It's not a secret — it's
+// an identifier — so it's fine to keep in client code. Real
+// enforcement (so no one can fake it via devtools) should live in
+// Firebase Realtime Database Security Rules — see note at bottom
+// of this file / chat.
+const SUPER_ADMIN_EMAIL = "your.email@gmail.com"; // <-- put your Gmail here
+
 // ── DOM refs ─────────────────────────────────────────────────
 const table               = document.getElementById("meal-register-table");
 const monthHeader         = document.getElementById("month-header");
@@ -71,7 +81,7 @@ function parseMonthKey(key) { const [y,m]=key.split("-").map(Number); return new
 function getMonthLabel(date) { return date.toLocaleDateString("en-US",{month:"long",year:"numeric"}); }
 function getDaysInMonth(date) { return new Date(date.getFullYear(),date.getMonth()+1,0).getDate(); }
 function isCurrentMonthView() { return getMonthKey(selectedMonthDate)===getMonthKey(monthStart(new Date())); }
-function isReadOnlyForUser() { return !isCurrentMonthView(); }
+function isReadOnlyForUser() { return !isSuperAdmin() && !isCurrentMonthView(); }
 function getTodayDay() { return new Date().getDate(); }
 
 // ── Number helpers ────────────────────────────────────────────
@@ -110,7 +120,8 @@ function getDefaultMember(i) {
         meals: Array(MAX_DAYS).fill(0),
         guestMeals: Array(MAX_DAYS).fill(0),
         mealLocked: Array(MAX_DAYS).fill(false),
-        guestMealLocked: Array(MAX_DAYS).fill(false)
+        guestMealLocked: Array(MAX_DAYS).fill(false),
+        fixedMealOff: false
     };
 }
 
@@ -131,7 +142,8 @@ function normalizeMember(m, i) {
         meals: normalizeArray(s.meals,MAX_DAYS,0).map(parseInput),
         guestMeals: normalizeArray(s.guestMeals,MAX_DAYS,0).map(parseInput),
         mealLocked: normalizeArray(s.mealLocked,MAX_DAYS,false).map(Boolean),
-        guestMealLocked: normalizeArray(s.guestMealLocked,MAX_DAYS,false).map(Boolean)
+        guestMealLocked: normalizeArray(s.guestMealLocked,MAX_DAYS,false).map(Boolean),
+        fixedMealOff: Boolean(s.fixedMealOff)
     };
 }
 
@@ -151,9 +163,13 @@ function initFirebase() {
 }
 
 // ── Auth helpers ──────────────────────────────────────────────
+function isSuperAdmin() {
+    return Boolean(currentUser) && currentUser.email === SUPER_ADMIN_EMAIL;
+}
+
 function computeManagerMode() {
     if (!currentUser) { isManagerMode=false; return; }
-    isManagerMode = (
+    isManagerMode = isSuperAdmin() || (
         isCurrentMonthView() &&
         storedManagerEmail !== "" &&
         currentUser.email === storedManagerEmail
@@ -176,10 +192,13 @@ function updateManagerUI() {
     }
 
     // Mode indicator
-    if (isManager) {
-        const photoHTML = currentUser?.photoURL
-            ? `<img src="${currentUser.photoURL}" class="avatar" alt="">`
-            : `<i class="fas fa-user-shield text-xs"></i>`;
+    const photoHTML = currentUser?.photoURL
+        ? `<img src="${currentUser.photoURL}" class="avatar" alt="">`
+        : `<i class="fas fa-user-shield text-xs"></i>`;
+
+    if (isSuperAdmin()) {
+        managerModeIndicator.innerHTML = `${photoHTML} Super Admin <span class="manager-badge">★</span>`;
+    } else if (isManager) {
         managerModeIndicator.innerHTML = `${photoHTML} Manager Mode <span class="manager-badge">✓</span>`;
     } else if (currentUser && !isManager && isCurrentMonthView()) {
         managerModeIndicator.innerHTML = `<i class="fas fa-eye text-xs"></i> Viewer (another manager is set)`;
@@ -367,7 +386,10 @@ function sumByDays(arr) {
 function getBillingTotal(person) {
     const real  = sumByDays(person.meals);
     const guest = sumByDays(person.guestMeals);
-    return (real < fixedMeal ? fixedMeal : real) + guest;
+    const hasStartedEating = real > 0;          // no meal entered yet? no floor yet
+    const floorApplies     = hasStartedEating && !person.fixedMealOff;
+    const billed = floorApplies ? (real < fixedMeal ? fixedMeal : real) : real;
+    return billed + guest;
 }
 
 function updateTotal(pi) {
@@ -377,12 +399,32 @@ function updateTotal(pi) {
     const tc = getBillingTotal(person);
     const cell = document.getElementById(`total-display-${pi}`);
     if (cell) {
+        const fmOff = Boolean(person.fixedMealOff);
+        const toggleHTML = isManagerMode
+            ? `<button class="fm-toggle-btn" data-person="${pi}"
+                 title="${fmOff ? 'Fixed Meal is OFF for this member — click to enable' : 'Fixed Meal is ON — click to disable (bill by real meals only)'}"
+                 style="margin-top:5px;width:100%;font-size:10px;font-weight:700;padding:3px 4px;border-radius:6px;cursor:pointer;
+                        border:1px solid ${fmOff ? '#f43f5e' : '#16a34a'};
+                        color:${fmOff ? '#f43f5e' : '#16a34a'};
+                        background:${fmOff ? '#fef2f2' : '#f0fdf4'};">
+                 FM: ${fmOff ? 'OFF' : 'ON'}
+               </button>`
+            : (fmOff ? `<div style="margin-top:5px;font-size:10px;font-weight:700;color:#f43f5e;text-align:center;">FM: OFF</div>` : '');
+
         cell.innerHTML = `
             <div class="p-2" style="min-width:75px;">
                 <div class="total-cell-tm flex justify-between gap-2"><span>Real:</span><span>${formatNumber(tm)}</span></div>
                 <div class="total-cell-gm flex justify-between gap-2"><span>Guest:</span><span>${formatNumber(gm)}</span></div>
                 <div class="total-cell-combined flex justify-between gap-2"><span>T:M:</span><span>${formatNumber(tc)}</span></div>
+                ${toggleHTML}
             </div>`;
+
+        if (isManagerMode) {
+            const btn = cell.querySelector(".fm-toggle-btn");
+            if (btn) btn.addEventListener("click", () => {
+                handleToggleFixedMeal(pi).catch(err => { console.error(err); showMessage("Failed", true); });
+            });
+        }
     }
     updateGrandTotal();
 }
@@ -635,6 +677,15 @@ async function handleTotalMembersChange(event) {
     await saveMonthData(true);
 }
 
+async function handleToggleFixedMeal(pi) {
+    if (!isManagerMode || isReadOnlyForUser()) return;
+    const member = mealData[pi];
+    if (!member) return;
+    member.fixedMealOff = !member.fixedMealOff;
+    updateTotal(pi);
+    await saveMonthData(true);
+}
+
 async function handleFixedMealSave() {
     if (!isManagerMode) { showMessage("Only manager can set fixed meal",true); return; }
     if (isReadOnlyForUser()) { showMessage("History is read-only",true); fixedMealInput.value=formatNumber(fixedMeal); return; }
@@ -675,6 +726,15 @@ async function handleGoogleSignIn() {
         const provider = new firebase.auth.GoogleAuthProvider();
         const result   = await firebase.auth().signInWithPopup(provider);
         const user     = result.user;
+
+        if (user.email === SUPER_ADMIN_EMAIL) {
+            // Super Admin: full control over every month, no claim needed
+            currentUser = user;
+            computeManagerMode();
+            updateManagerUI();
+            showMessage(`Welcome, Super Admin ${user.displayName||user.email}!`);
+            return;
+        }
 
         // Check current month's managerEmail in Firebase
         const monthKey = getMonthKey(monthStart(new Date()));
