@@ -46,6 +46,10 @@ const bazarEditor         = document.getElementById("bazar-editor");
 const noteToggleBtn       = document.getElementById("note-toggle-btn");
 const notesPanel          = document.getElementById("notes-panel");
 const notesEditor         = document.getElementById("notes-editor");
+const depositToggleBtn    = document.getElementById("deposit-toggle-btn");
+const depositPanel        = document.getElementById("deposit-panel");
+const depositList         = document.getElementById("deposit-list");
+const depositTotal        = document.getElementById("deposit-total");
 const googleSigninBtn     = document.getElementById("google-signin-btn");
 const managerLogoutBtn    = document.getElementById("manager-logout-btn");
 const changeManagerBtn    = document.getElementById("change-manager-btn");
@@ -65,8 +69,10 @@ let mealData           = [];
 let isManagerMode      = false;
 let isBazarVisible     = false;
 let isNoteVisible      = false;
+let isDepositVisible   = false;
 let bazarCostText      = "";
 let monthNote          = "";
+let depositData        = [];
 let selectedMonthDate  = monthStart(new Date());
 let selectedMonthDays  = getDaysInMonth(selectedMonthDate);
 let currentUser        = null;   // firebase.auth().currentUser
@@ -153,6 +159,13 @@ function normalizeMembers(members, count) {
     return Array.from({length:count},(_,i)=>normalizeMember(src[i],i));
 }
 
+function normalizeDeposits(deposits, count) {
+    const src = Array.isArray(deposits)
+        ? deposits
+        : (deposits && typeof deposits==="object" ? deposits : {});
+    return Array.from({length:count},(_,i)=>parseInput(src[i]));
+}
+
 // ── Firebase init ─────────────────────────────────────────────
 function initFirebase() {
     if (!FIREBASE_CONFIG?.apiKey) { isFirebaseMode=false; return false; }
@@ -219,6 +232,11 @@ function updateManagerUI() {
     membersInput.disabled    = !isManager || readOnly;
     if (bazarEditor) bazarEditor.disabled  = !isManager || readOnly;
     if (notesEditor) notesEditor.disabled  = !isManager || readOnly;
+    if (depositList) {
+        depositList.querySelectorAll(".deposit-input").forEach(input => {
+            input.disabled = !isManager || readOnly;
+        });
+    }
 
     if (managerNameInput) {
         managerNameInput.readOnly = !isManager;
@@ -246,6 +264,48 @@ function renderNotes() {
     notesPanel.classList.toggle("visible", isNoteVisible);
     notesEditor.value = monthNote;
     notesEditor.disabled = !isManagerMode || isReadOnlyForUser();
+}
+
+function renderDeposits() {
+    if (!depositPanel || !depositList) return;
+    depositPanel.classList.toggle("visible", isDepositVisible);
+    depositData = normalizeDeposits(depositData, numPeople);
+
+    depositList.innerHTML = "";
+    mealData.forEach((person, pi) => {
+        const row = document.createElement("div");
+        row.className = "deposit-row";
+
+        const serial = document.createElement("div");
+        serial.className = "deposit-serial";
+        serial.textContent = String(pi+1);
+
+        const name = document.createElement("div");
+        name.className = "deposit-name";
+        name.textContent = person.name;
+        name.title = person.name;
+
+        const input = document.createElement("input");
+        input.type = "number";
+        input.min = "0";
+        input.step = "1";
+        input.className = "deposit-input";
+        input.dataset.person = String(pi);
+        input.value = depositData[pi] ? formatNumber(depositData[pi]) : "";
+        input.placeholder = "0";
+        input.disabled = !isManagerMode || isReadOnlyForUser();
+
+        row.append(serial, name, input);
+        depositList.appendChild(row);
+    });
+
+    updateDepositTotal();
+}
+
+function updateDepositTotal() {
+    if (!depositTotal) return;
+    const total = depositData.reduce((sum, value) => sum + parseInput(value), 0);
+    depositTotal.textContent = `${formatNumber(total)} Tk`;
 }
 
 // ── Table rendering ───────────────────────────────────────────
@@ -515,6 +575,7 @@ function buildInitialFields() {
         managerName:   (managerNameInput?.value||"").trim(),
         bazarCost:     bazarCostText,
         note:          monthNote,
+        deposits:      depositData,
         members:       mealData
     };
 }
@@ -599,6 +660,7 @@ function applyMonthData(data) {
     bazarCostText    = typeof data?.bazarCost==="string" ? data.bazarCost : "";
     monthNote        = typeof data?.note==="string" ? data.note : "";
     mealData         = normalizeMembers(data?.members, count);
+    depositData      = normalizeDeposits(data?.deposits, count);
     storedManagerEmail = mgrEmail;
 
     membersInput.value        = String(numPeople);
@@ -611,6 +673,7 @@ function applyDefaultMonth() {
     fixedMeal        = 60;
     bazarCostText    = "";
     monthNote        = "";
+    depositData      = Array(numPeople).fill(0);
     storedManagerEmail = "";
     mealData         = Array.from({length:numPeople},(_,i)=>getDefaultMember(i));
     membersInput.value        = "20";
@@ -629,13 +692,13 @@ async function openMonth(date) {
         const data = readLocalStore()[monthKey];
         if (!data) {
             applyDefaultMonth();
-            renderBazarCost(); renderNotes();
+            renderBazarCost(); renderNotes(); renderDeposits();
             updateManagerUI();
             await saveFields(buildInitialFields(), false);
         } else {
             applyMonthData(data);
             computeManagerMode();
-            renderBazarCost(); renderNotes();
+            renderBazarCost(); renderNotes(); renderDeposits();
             updateManagerUI();
         }
         return;
@@ -649,14 +712,14 @@ async function openMonth(date) {
     const handleSnap = async (snap) => {
         if (!snap.exists()) {
             applyDefaultMonth();
-            renderBazarCost(); renderNotes();
+            renderBazarCost(); renderNotes(); renderDeposits();
             updateManagerUI();
             // Only manager can init a new month document
             if (isManagerMode) await saveFields(buildInitialFields(), false);
         } else {
             applyMonthData(snap.val()||{});
             computeManagerMode();
-            renderBazarCost(); renderNotes();
+            renderBazarCost(); renderNotes(); renderDeposits();
             updateManagerUI();
         }
         hideSkeleton();
@@ -690,6 +753,7 @@ function handleNameInputChange(event) {
         member.name = value;
         member.nameLocked = true;
     }
+    renderDeposits();
     debounceKeyed(`name-${pi}`, () => {
         saveFields({
             [`members/${pi}/name`]:       member.name,
@@ -739,9 +803,11 @@ async function handleTotalMembersChange(event) {
     event.target.value = String(n);
     if (n===numPeople) return;
     mealData = Array.from({length:n},(_,i)=>normalizeMember(mealData[i],i));
+    depositData = normalizeDeposits(depositData, n);
     numPeople = n;
     renderTable();
-    await saveFields({ members: mealData, memberCount: numPeople }, true);
+    renderDeposits();
+    await saveFields({ members: mealData, deposits: depositData, memberCount: numPeople }, true);
 }
 
 async function handleToggleFixedMeal(pi) {
@@ -784,6 +850,26 @@ async function saveBazarCostText(raw, showFeedback=false) {
         if (typeof cur==="number") bazarEditor.selectionStart = bazarEditor.selectionEnd = Math.min(cur,n.length);
     }
     await saveFields({ bazarCost: n }, showFeedback);
+}
+
+function handleDepositInputChange(event) {
+    const input = event.target;
+    if (!input.classList.contains("deposit-input")) return;
+    const pi = parseInt(input.dataset.person, 10);
+    if (!Number.isInteger(pi) || pi < 0 || pi >= depositData.length) return;
+    if (!isManagerMode || isReadOnlyForUser()) {
+        input.value = depositData[pi] ? formatNumber(depositData[pi]) : "";
+        return;
+    }
+
+    const value = parseInput(input.value);
+    depositData[pi] = Number.isFinite(value) && value >= 0 ? value : 0;
+    updateDepositTotal();
+
+    debounceKeyed(`deposit-${pi}`, () => {
+        saveFields({ [`deposits/${pi}`]: depositData[pi] })
+            .catch(err => { console.error(err); showMessage("Deposit save failed", true); });
+    }, 350);
 }
 
 // ── Google Auth ───────────────────────────────────────────────
@@ -950,11 +1036,22 @@ function bindEvents() {
         bazarPanel.scrollIntoView({behavior:"smooth",block:"start"});
     });
 
+    if (depositToggleBtn) {
+        depositToggleBtn.addEventListener("click", ()=>{
+            isDepositVisible = true;
+            renderDeposits();
+            depositPanel.scrollIntoView({behavior:"smooth",block:"start"});
+        });
+    }
+
     document.getElementById("notes-close-btn").addEventListener("click",()=>{
         isNoteVisible=false; renderNotes();
     });
     document.getElementById("bazar-close-btn").addEventListener("click",()=>{
         isBazarVisible=false; renderBazarCost();
+    });
+    document.getElementById("deposit-close-btn").addEventListener("click",()=>{
+        isDepositVisible=false; renderDeposits();
     });
 
     if (bazarEditor) {
@@ -979,6 +1076,20 @@ function bindEvents() {
         });
     }
 
+    if (depositList) {
+        depositList.addEventListener("input", handleDepositInputChange);
+        depositList.addEventListener("blur", event => {
+            const input = event.target;
+            if (!input.classList.contains("deposit-input")) return;
+            const pi = parseInt(input.dataset.person, 10);
+            if (!Number.isInteger(pi) || pi < 0 || pi >= depositData.length) return;
+            input.value = depositData[pi] ? formatNumber(depositData[pi]) : "";
+            if (!isManagerMode || isReadOnlyForUser()) return;
+            saveFields({ [`deposits/${pi}`]: depositData[pi] }, true)
+                .catch(err => { console.error(err); showMessage("Deposit save failed", true); });
+        }, true);
+    }
+
     const fab = document.getElementById("floatingButton");
     if (fab) fab.addEventListener("click", ()=>window.open("https://mealcalapp.github.io/for-all/","_blank"));
 }
@@ -988,6 +1099,7 @@ async function boot() {
     try {
         renderBazarCost();
         renderNotes();
+        renderDeposits();
         bindEvents();
 
         const firebaseReady = initFirebase();

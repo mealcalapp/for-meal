@@ -95,6 +95,9 @@
             <button id="note-toggle-btn" class="note-toggle-btn px-3 py-1.5 text-sm font-semibold text-white rounded-lg">
                 <i class="fas fa-sticky-note mr-1"></i>Additional Cost
             </button>
+            <button id="deposit-toggle-btn" class="deposit-toggle-btn px-3 py-1.5 text-sm font-semibold text-white rounded-lg">
+                <i class="fas fa-money-bill-wave mr-1"></i>Deposit Tk
+            </button>
 
             <!-- Google Sign-in button -->
             <button id="google-signin-btn" class="google-btn">
@@ -151,6 +154,24 @@
         <button class="panel-close-btn" id="notes-close-btn" title="Close">✕</button>
     </div>
     <textarea id="notes-editor" class="notes-editor" placeholder="Write additional costs here… (lines ending with = auto-calculate)"></textarea>
+</section>
+
+<!-- DEPOSIT PANEL -->
+<section id="deposit-panel" class="deposit-panel">
+    <div class="deposit-toolbar">
+        <div>
+            <div class="deposit-title"><i class="fas fa-money-bill-wave mr-2"></i>Deposit Tk</div>
+            <div class="deposit-hint">Only Manager can edit</div>
+        </div>
+        <button class="panel-close-btn" id="deposit-close-btn" title="Close">✕</button>
+    </div>
+    <div class="deposit-list-wrap">
+        <div id="deposit-list" class="deposit-list"></div>
+        <div class="deposit-total-row">
+            <span>Total Deposit</span>
+            <strong id="deposit-total">0 Tk</strong>
+        </div>
+    </div>
 </section>
 
 <!-- MARQUEE -->
