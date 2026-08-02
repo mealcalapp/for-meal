@@ -1091,7 +1091,12 @@ function bindEvents() {
     }
 
     const fab = document.getElementById("floatingButton");
-    if (fab) fab.addEventListener("click", ()=>window.open("https://mealcalapp.github.io/for-all/","_blank"));
+        if (fab) {
+        fab.addEventListener("click", () => {
+            const month = getMonthKey(selectedMonthDate);
+            window.open(`https://mealcalapp.github.io/for-all/?month=${month}`, "_blank");
+        });
+    }
 }
 
 // ── Boot ──────────────────────────────────────────────────────
