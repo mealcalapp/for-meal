@@ -17,6 +17,7 @@ const FIREBASE_CONFIG = window.FIREBASE_CONFIG || {
 
 const COLLECTION_NAME = "meal_register";
 const LOCAL_FALLBACK_KEY = "mealRegistersLocalFallback";
+const CALCULATOR_SYNC_KEY = "mealCalculatorSyncData";
 const MAX_DAYS = 31;
 
 // ── Super Admin ──────────────────────────────────────────────
@@ -42,10 +43,12 @@ const fixedMealSaveBtn    = document.getElementById("fixed-meal-save-btn");
 const managerOnlyMembers  = document.getElementById("manager-only-total-members");
 const bazarToggleBtn      = document.getElementById("bazar-toggle-btn");
 const bazarPanel          = document.getElementById("bazar-panel");
-const bazarEditor         = document.getElementById("bazar-editor");
+const bazarList           = document.getElementById("bazar-list");
+const bazarTotal          = document.getElementById("bazar-total");
 const noteToggleBtn       = document.getElementById("note-toggle-btn");
 const notesPanel          = document.getElementById("notes-panel");
-const notesEditor         = document.getElementById("notes-editor");
+const additionalList      = document.getElementById("additional-list");
+const additionalTotal     = document.getElementById("additional-total");
 const depositToggleBtn    = document.getElementById("deposit-toggle-btn");
 const depositPanel        = document.getElementById("deposit-panel");
 const depositList         = document.getElementById("deposit-list");
@@ -72,6 +75,8 @@ let isNoteVisible      = false;
 let isDepositVisible   = false;
 let bazarCostText      = "";
 let monthNote          = "";
+let bazarEntries       = [];
+let additionalEntries  = [];
 let depositData        = [];
 let selectedMonthDate  = monthStart(new Date());
 let selectedMonthDays  = getDaysInMonth(selectedMonthDate);
@@ -166,6 +171,47 @@ function normalizeDeposits(deposits, count) {
     return Array.from({length:count},(_,i)=>parseInput(src[i]));
 }
 
+function sumCostText(text) {
+    return String(text || "").split("\n").reduce((total,line)=>{
+        const trimmed = line.trim();
+        if (!trimmed) return total;
+        const afterEqual = trimmed.match(/=\s*(-?\d+(?:\.\d+)?)/);
+        if (afterEqual) return total + parseInput(afterEqual[1]);
+        if (/^-?\d+(?:\.\d+)?$/.test(trimmed)) return total + parseInput(trimmed);
+        return total;
+    },0);
+}
+
+function getDefaultCostEntry() {
+    return { date: "", name: "", items: "", amount: 0 };
+}
+
+function normalizeCostEntries(entries, count, legacyText="") {
+    const src = Array.isArray(entries) ? entries : [];
+    const out = Array.from({length:count},(_,i)=>{
+        const item = src[i] && typeof src[i]==="object" ? src[i] : {};
+        return {
+            date: typeof item.date==="string" ? item.date : "",
+            name: typeof item.name==="string" ? item.name : "",
+            items: typeof item.items==="string" ? item.items : "",
+            amount: parseInput(item.amount)
+        };
+    });
+
+    if (!src.length && legacyText) {
+        const legacyTotal = sumCostText(legacyText);
+        if (legacyTotal > 0) {
+            out[0] = { date: "", name: "Previous", items: "", amount: legacyTotal };
+        }
+    }
+
+    return out;
+}
+
+function getCostTotal(entries) {
+    return entries.reduce((sum,item)=>sum+parseInput(item.amount),0);
+}
+
 // ── Firebase init ─────────────────────────────────────────────
 function initFirebase() {
     if (!FIREBASE_CONFIG?.apiKey) { isFirebaseMode=false; return false; }
@@ -230,8 +276,16 @@ function updateManagerUI() {
     // Disable/enable inputs
     fixedMealInput.disabled  = !isManager || readOnly;
     membersInput.disabled    = !isManager || readOnly;
-    if (bazarEditor) bazarEditor.disabled  = !isManager || readOnly;
-    if (notesEditor) notesEditor.disabled  = !isManager || readOnly;
+    if (bazarList) {
+        bazarList.querySelectorAll(".cost-input").forEach(input => {
+            input.disabled = !isManager || readOnly;
+        });
+    }
+    if (additionalList) {
+        additionalList.querySelectorAll(".cost-input").forEach(input => {
+            input.disabled = !isManager || readOnly;
+        });
+    }
     if (depositList) {
         depositList.querySelectorAll(".deposit-input").forEach(input => {
             input.disabled = !isManager || readOnly;
@@ -255,15 +309,77 @@ function updateHeaderAndNotice() {
 
 // ── Render panels ─────────────────────────────────────────────
 function renderBazarCost() {
+    if (!bazarPanel || !bazarList) return;
     bazarPanel.classList.toggle("visible", isBazarVisible);
-    bazarEditor.value = bazarCostText;
-    bazarEditor.disabled = !isManagerMode || isReadOnlyForUser();
+    bazarEntries = normalizeCostEntries(bazarEntries, 11);
+    renderCostRows(bazarList, bazarEntries, "bazar", false);
+    updateBazarTotal();
 }
 
 function renderNotes() {
+    if (!notesPanel || !additionalList) return;
     notesPanel.classList.toggle("visible", isNoteVisible);
-    notesEditor.value = monthNote;
-    notesEditor.disabled = !isManagerMode || isReadOnlyForUser();
+    additionalEntries = normalizeCostEntries(additionalEntries, 11);
+    renderCostRows(additionalList, additionalEntries, "additional", true);
+    updateAdditionalTotal();
+}
+
+function createCostInput(kind, index, field, value, placeholder, type="text") {
+    const input = document.createElement("input");
+    input.type = type;
+    if (type==="number") {
+        input.min = "0";
+        input.step = "1";
+    }
+    input.className = `cost-input cost-${field}-input`;
+    input.dataset.kind = kind;
+    input.dataset.index = String(index);
+    input.dataset.field = field;
+    input.value = type==="number" ? (value ? formatNumber(value) : "") : (value || "");
+    input.placeholder = placeholder;
+    input.disabled = !isManagerMode || isReadOnlyForUser();
+    return input;
+}
+
+function renderCostRows(list, entries, kind, includeItems) {
+    list.innerHTML = "";
+    entries.forEach((entry, index) => {
+        const row = document.createElement("div");
+        row.className = `cost-grid cost-row ${includeItems ? "cost-grid-additional" : "cost-grid-bazar"}`;
+
+        row.appendChild(createCostInput(kind, index, "date", entry.date, "Date"));
+        row.appendChild(createCostInput(kind, index, "name", entry.name, "Name"));
+        if (includeItems) row.appendChild(createCostInput(kind, index, "items", entry.items, "Items"));
+        row.appendChild(createCostInput(kind, index, "amount", entry.amount, "0", "number"));
+
+        list.appendChild(row);
+    });
+}
+
+function syncCalculatorTotals() {
+    try {
+        localStorage.setItem(CALCULATOR_SYNC_KEY, JSON.stringify({
+            month: getMonthKey(selectedMonthDate),
+            bazar: getCostTotal(bazarEntries),
+            additional: getCostTotal(additionalEntries)
+        }));
+    } catch (e) {
+        console.warn("Calculator sync failed", e);
+    }
+}
+
+function updateBazarTotal() {
+    const total = getCostTotal(bazarEntries);
+    bazarCostText = total ? String(formatNumber(total)) : "";
+    if (bazarTotal) bazarTotal.textContent = `${formatNumber(total)} Tk`;
+    syncCalculatorTotals();
+}
+
+function updateAdditionalTotal() {
+    const total = getCostTotal(additionalEntries);
+    monthNote = total ? String(formatNumber(total)) : "";
+    if (additionalTotal) additionalTotal.textContent = `${formatNumber(total)} Tk`;
+    syncCalculatorTotals();
 }
 
 function renderDeposits() {
@@ -574,7 +690,11 @@ function buildInitialFields() {
         fixedMeal,
         managerName:   (managerNameInput?.value||"").trim(),
         bazarCost:     bazarCostText,
+        bazarEntries,
+        bazarTotal:     getCostTotal(bazarEntries),
         note:          monthNote,
+        additionalEntries,
+        additionalTotal:getCostTotal(additionalEntries),
         deposits:      depositData,
         members:       mealData
     };
@@ -659,6 +779,10 @@ function applyMonthData(data) {
     fixedMeal        = fixed;
     bazarCostText    = typeof data?.bazarCost==="string" ? data.bazarCost : "";
     monthNote        = typeof data?.note==="string" ? data.note : "";
+    bazarEntries     = normalizeCostEntries(data?.bazarEntries, 11, bazarCostText);
+    additionalEntries= normalizeCostEntries(data?.additionalEntries, 11, monthNote);
+    updateBazarTotal();
+    updateAdditionalTotal();
     mealData         = normalizeMembers(data?.members, count);
     depositData      = normalizeDeposits(data?.deposits, count);
     storedManagerEmail = mgrEmail;
@@ -673,6 +797,8 @@ function applyDefaultMonth() {
     fixedMeal        = 60;
     bazarCostText    = "";
     monthNote        = "";
+    bazarEntries     = normalizeCostEntries([], 11);
+    additionalEntries= normalizeCostEntries([], 11);
     depositData      = Array(numPeople).fill(0);
     storedManagerEmail = "";
     mealData         = Array.from({length:numPeople},(_,i)=>getDefaultMember(i));
@@ -833,23 +959,54 @@ async function handleFixedMealSave() {
 async function saveNoteText(raw, showFeedback=false) {
     const n = normalizeNoteText(raw);
     monthNote = n;
-    if (notesEditor && notesEditor.value!==n) {
-        const cur = notesEditor.selectionStart;
-        notesEditor.value = n;
-        if (typeof cur==="number") notesEditor.selectionStart = notesEditor.selectionEnd = Math.min(cur,n.length);
-    }
     await saveFields({ note: n }, showFeedback);
 }
 
 async function saveBazarCostText(raw, showFeedback=false) {
     const n = normalizeNoteText(raw);
     bazarCostText = n;
-    if (bazarEditor && bazarEditor.value!==n) {
-        const cur = bazarEditor.selectionStart;
-        bazarEditor.value = n;
-        if (typeof cur==="number") bazarEditor.selectionStart = bazarEditor.selectionEnd = Math.min(cur,n.length);
-    }
     await saveFields({ bazarCost: n }, showFeedback);
+}
+
+function handleCostInputChange(event) {
+    const input = event.target;
+    if (!input.classList.contains("cost-input")) return;
+    const kind = input.dataset.kind;
+    const index = parseInt(input.dataset.index, 10);
+    const field = input.dataset.field;
+    const entries = kind==="bazar" ? bazarEntries : additionalEntries;
+
+    if (!Number.isInteger(index) || index < 0 || index >= entries.length) return;
+    if (!isManagerMode || isReadOnlyForUser()) {
+        input.value = field==="amount"
+            ? (entries[index].amount ? formatNumber(entries[index].amount) : "")
+            : (entries[index][field] || "");
+        return;
+    }
+
+    entries[index][field] = field==="amount" ? parseInput(input.value) : input.value.trim();
+
+    if (kind==="bazar") {
+        updateBazarTotal();
+        const total = getCostTotal(bazarEntries);
+        debounceKeyed(`bazar-${index}-${field}`, () => {
+            saveFields({
+                [`bazarEntries/${index}/${field}`]: bazarEntries[index][field],
+                bazarTotal: total,
+                bazarCost: total ? String(formatNumber(total)) : ""
+            }).catch(err => { console.error(err); showMessage("Bazar cost save failed", true); });
+        }, 350);
+    } else {
+        updateAdditionalTotal();
+        const total = getCostTotal(additionalEntries);
+        debounceKeyed(`additional-${index}-${field}`, () => {
+            saveFields({
+                [`additionalEntries/${index}/${field}`]: additionalEntries[index][field],
+                additionalTotal: total,
+                note: total ? String(formatNumber(total)) : ""
+            }).catch(err => { console.error(err); showMessage("Additional cost save failed", true); });
+        }, 350);
+    }
 }
 
 function handleDepositInputChange(event) {
@@ -1054,26 +1211,36 @@ function bindEvents() {
         isDepositVisible=false; renderDeposits();
     });
 
-    if (bazarEditor) {
-        bazarEditor.addEventListener("input", ()=>{
-            if (!isManagerMode||isReadOnlyForUser()) { bazarEditor.value=bazarCostText; return; }
-            saveBazarCostText(bazarEditor.value).catch(console.error);
-        });
-        bazarEditor.addEventListener("blur", ()=>{
-            if (!isManagerMode||isReadOnlyForUser()) return;
-            saveBazarCostText(bazarEditor.value,true).catch(console.error);
-        });
+    if (bazarList) {
+        bazarList.addEventListener("input", handleCostInputChange);
+        bazarList.addEventListener("blur", event => {
+            const input = event.target;
+            if (!input.classList.contains("cost-input")) return;
+            if (input.dataset.field==="amount") {
+                const index = parseInt(input.dataset.index, 10);
+                input.value = bazarEntries[index]?.amount ? formatNumber(bazarEntries[index].amount) : "";
+            }
+            if (!isManagerMode || isReadOnlyForUser()) return;
+            const total = getCostTotal(bazarEntries);
+            saveFields({ bazarEntries, bazarTotal: total, bazarCost: total ? String(formatNumber(total)) : "" }, true)
+                .catch(err => { console.error(err); showMessage("Bazar cost save failed", true); });
+        }, true);
     }
 
-    if (notesEditor) {
-        notesEditor.addEventListener("input", ()=>{
-            if (!isManagerMode||isReadOnlyForUser()) { notesEditor.value=monthNote; return; }
-            saveNoteText(notesEditor.value).catch(console.error);
-        });
-        notesEditor.addEventListener("blur", ()=>{
-            if (!isManagerMode||isReadOnlyForUser()) return;
-            saveNoteText(notesEditor.value,true).catch(console.error);
-        });
+    if (additionalList) {
+        additionalList.addEventListener("input", handleCostInputChange);
+        additionalList.addEventListener("blur", event => {
+            const input = event.target;
+            if (!input.classList.contains("cost-input")) return;
+            if (input.dataset.field==="amount") {
+                const index = parseInt(input.dataset.index, 10);
+                input.value = additionalEntries[index]?.amount ? formatNumber(additionalEntries[index].amount) : "";
+            }
+            if (!isManagerMode || isReadOnlyForUser()) return;
+            const total = getCostTotal(additionalEntries);
+            saveFields({ additionalEntries, additionalTotal: total, note: total ? String(formatNumber(total)) : "" }, true)
+                .catch(err => { console.error(err); showMessage("Additional cost save failed", true); });
+        }, true);
     }
 
     if (depositList) {
@@ -1091,10 +1258,14 @@ function bindEvents() {
     }
 
     const fab = document.getElementById("floatingButton");
-        if (fab) {
+    if (fab) {
         fab.addEventListener("click", () => {
-            const month = getMonthKey(selectedMonthDate);
-            window.open(`https://mealcalapp.github.io/for-all/?month=${month}`, "_blank");
+            const params = new URLSearchParams({
+                month: getMonthKey(selectedMonthDate),
+                bazar: String(getCostTotal(bazarEntries)),
+                additional: String(getCostTotal(additionalEntries))
+            });
+            window.open(`./for-all-main/index.html?${params.toString()}`, "_blank");
         });
     }
 }
