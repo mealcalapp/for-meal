@@ -343,7 +343,9 @@ tbody tr:not(.guest-row):hover .sticky-col-left { background-color: #f1f5f9; }
 .locked-input {
     cursor: not-allowed;
     background: transparent !important;
-    color: #94a3b8 !important;
+    color: #0f172a !important;
+    -webkit-text-fill-color: #0f172a;
+    opacity: 1;
     position: relative;
 }
 
