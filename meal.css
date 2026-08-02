@@ -703,7 +703,7 @@ input[type=number]::-webkit-inner-spin-button {
 }
 
 @media (max-width: 480px) {
-    th, td { min-width: 46px !important; font-size: 0.72rem; }
+    th, td { min-width: 50px !important; font-size: 0.72rem; }
     .name-cell  { min-width: 120px !important; max-width: 120px !important; }
     .serial-cell { min-width: 26px !important; max-width: 26px !important; width: 26px !important; }
     .meal-input { height: 32px; font-size: 0.72rem; }
