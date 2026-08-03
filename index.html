@@ -21,6 +21,37 @@
             }
         }
     </script>
+<style>
+    .marquee-container {
+  overflow: hidden;
+  white-space: nowrap;
+  border: 1px solid #699ef5;
+  padding: 4px;
+  border-radius: 6px;
+  position: relative;
+  margin-top: 8px;
+  font-size: 11px;
+  font-weight: 650; 
+  letter-spacing: 1.5px;
+  }
+
+.marquee-text {
+  display: inline-block;
+  padding-left: 100%;
+  color: rgba(70, 153, 236, 0.85);
+  animation: scroll-left 12s linear infinite;
+}
+
+/* Smooth scrolling animation */
+@keyframes scroll-left {
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(-100%);
+  }
+}
+</style>
 </head>
 <body class="p-4 md:p-8">
 
@@ -126,7 +157,11 @@
         </div>
     </div>
 </header>
-
+<div class="notice-box mb-2">
+    <div class="marquee-container">
+      <div id="monthMarquee" class="marquee-text">Dupurer meal khaile sokaler meal auto uthbe..</div>
+    </div>
+</div>
 <!-- TABLE -->
 <div id="table-container" class="w-full">
     <table id="meal-register-table" class="min-w-full border-collapse text-sm"></table>
