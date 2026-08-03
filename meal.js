@@ -330,6 +330,7 @@ function renderTable() {
     table.innerHTML = "";
     renderTableHeader();
     renderTableBody();
+    scrollTodayColumnIntoView();
 
     if (focusInfo) {
         const sel = focusInfo.isName
@@ -341,6 +342,23 @@ function renderTable() {
             try { sel.setSelectionRange(focusInfo.selStart, focusInfo.selEnd); } catch(e) {}
         }
     }
+}
+
+function scrollTodayColumnIntoView() {
+    if (!window.matchMedia('(max-width: 768px)').matches) return;
+    const container = document.getElementById('table-container');
+    if (!container) return;
+    const todayHeader = table.querySelector('th.today-col');
+    if (!todayHeader) return;
+
+    const containerRect = container.getBoundingClientRect();
+    const headerRect = todayHeader.getBoundingClientRect();
+    const offset = headerRect.left - containerRect.left;
+    const centerOffset = Math.round((container.clientWidth - headerRect.width) / 2);
+    const desiredScroll = container.scrollLeft + offset - centerOffset;
+    const maxScroll = Math.max(0, container.scrollWidth - container.clientWidth);
+
+    container.scrollTo({ left: Math.min(maxScroll, Math.max(0, desiredScroll)), behavior: 'auto' });
 }
 
 function renderTableHeader() {
