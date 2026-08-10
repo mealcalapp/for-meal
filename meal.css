@@ -688,7 +688,7 @@ input[type=number]::-webkit-inner-spin-button {
     #table-container td[id^="total-display"] > div { min-width: 68px; padding: 4px; }
 
     /* Header row */
-    .sticky-header { font-size: 0.58rem; padding: 3px 2px !important; line-height: 1.15; }
+    .sticky-header { font-size: 0.58rem; padding: 3px 2px !important; line-height: 1.21; }
     .grand-total-row td { padding: 8px; font-size: 0.72rem; }
 
     /* Panels */
