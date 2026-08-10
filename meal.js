@@ -371,7 +371,9 @@ function renderTableHeader() {
 
     for (let d=1; d<=selectedMonthDays; d++) {
         const isToday = isCurrentMonthView() && d===today;
-        row.insertCell().outerHTML = `<th class="sticky-header text-center p-2${isToday?' today-col':''}">${d}${isToday?'<br><span class="today-label">TODAY</span>':''}</th>`;
+        const dayName = new Date(selectedMonthDate.getFullYear(), selectedMonthDate.getMonth(), d)
+            .toLocaleDateString("en-US", { weekday: "short" }).toUpperCase();
+        row.insertCell().outerHTML = `<th class="sticky-header text-center p-2${isToday?' today-col':''}">${d}<br><span class="day-name-label">${dayName}</span>${isToday?'<br><span class="today-label">TODAY</span>':''}</th>`;
     }
 
     row.insertCell().outerHTML = '<th class="sticky-col-right sticky-header text-center p-2" style="min-width:90px;">Total<br><span id="grand-total" class="font-bold text-cyan-300">0</span></th>';
