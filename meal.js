@@ -43,9 +43,15 @@ const managerOnlyMembers  = document.getElementById("manager-only-total-members"
 const bazarToggleBtn      = document.getElementById("bazar-toggle-btn");
 const bazarPanel          = document.getElementById("bazar-panel");
 const bazarEditor         = document.getElementById("bazar-editor");
+const bazarRowsContainer  = document.getElementById("bazar-rows");
+const bazarAddRowBtn      = document.getElementById("bazar-add-row-btn");
+const bazarCostTotalEl    = document.getElementById("bazar-cost-total");
 const noteToggleBtn       = document.getElementById("note-toggle-btn");
 const notesPanel          = document.getElementById("notes-panel");
 const notesEditor         = document.getElementById("notes-editor");
+const notesRowsContainer  = document.getElementById("notes-rows");
+const notesAddRowBtn      = document.getElementById("notes-add-row-btn");
+const notesCostTotalEl    = document.getElementById("notes-cost-total");
 const depositToggleBtn    = document.getElementById("deposit-toggle-btn");
 const depositPanel        = document.getElementById("deposit-panel");
 const depositList         = document.getElementById("deposit-list");
@@ -72,6 +78,9 @@ let isNoteVisible      = false;
 let isDepositVisible   = false;
 let bazarCostText      = "";
 let monthNote          = "";
+let bazarRows          = [];   // parsed rows for the Bazar Cost notepad editor
+let noteRows           = [];   // parsed rows for the Additional Cost notepad editor
+let costRowSeq         = 0;
 let depositData        = [];
 let selectedMonthDate  = monthStart(new Date());
 let selectedMonthDays  = getDaysInMonth(selectedMonthDate);
@@ -232,6 +241,17 @@ function updateManagerUI() {
     membersInput.disabled    = !isManager || readOnly;
     if (bazarEditor) bazarEditor.disabled  = !isManager || readOnly;
     if (notesEditor) notesEditor.disabled  = !isManager || readOnly;
+    const costEditable = isManager && !readOnly;
+    if (bazarRowsContainer) {
+        bazarRowsContainer.querySelectorAll(".cost-desc-input, .cost-amount-input, .cost-row-delete")
+            .forEach(el => { el.disabled = !costEditable; });
+    }
+    if (bazarAddRowBtn) bazarAddRowBtn.disabled = !costEditable;
+    if (notesRowsContainer) {
+        notesRowsContainer.querySelectorAll(".cost-desc-input, .cost-amount-input, .cost-row-delete")
+            .forEach(el => { el.disabled = !costEditable; });
+    }
+    if (notesAddRowBtn) notesAddRowBtn.disabled = !costEditable;
     if (depositList) {
         depositList.querySelectorAll(".deposit-input").forEach(input => {
             input.disabled = !isManager || readOnly;
@@ -256,14 +276,258 @@ function updateHeaderAndNotice() {
 // ── Render panels ─────────────────────────────────────────────
 function renderBazarCost() {
     bazarPanel.classList.toggle("visible", isBazarVisible);
-    bazarEditor.value = bazarCostText;
-    bazarEditor.disabled = !isManagerMode || isReadOnlyForUser();
+    if (bazarEditor) {
+        bazarEditor.value = bazarCostText;
+        bazarEditor.disabled = !isManagerMode || isReadOnlyForUser();
+    }
+    // Only reparse from the stored text when it actually changed elsewhere
+    // (new month loaded, remote edit) — not on every echo of our own save,
+    // so we don't rebuild the rows out from under the manager's cursor.
+    if (serializeRows(bazarRows) !== bazarCostText) {
+        bazarRows = parseRowsFromText(bazarCostText);
+    }
+    renderCostRows("bazar");
 }
 
 function renderNotes() {
     notesPanel.classList.toggle("visible", isNoteVisible);
-    notesEditor.value = monthNote;
-    notesEditor.disabled = !isManagerMode || isReadOnlyForUser();
+    if (notesEditor) {
+        notesEditor.value = monthNote;
+        notesEditor.disabled = !isManagerMode || isReadOnlyForUser();
+    }
+    if (serializeRows(noteRows) !== monthNote) {
+        noteRows = parseRowsFromText(monthNote);
+    }
+    renderCostRows("notes");
+}
+
+// ── Ruled notepad row editor (Bazar Cost / Additional Cost) ────
+function nextRowId() { return `r${++costRowSeq}`; }
+
+function parseCostAmount(str) {
+    if (str === null || str === undefined) return null;
+    const cleaned = String(str).replace(/,/g, "").trim();
+    if (cleaned === "") return null;
+    const n = Number(cleaned);
+    return Number.isFinite(n) ? n : null;
+}
+
+// Best-effort parse of a saved text line into {desc, amount}. Understands
+// the new "Item = Amount" / "Item: Amount" row format, and degrades
+// gracefully for older freeform notes (kept as a description-only row)
+// so previously saved Bazar/Additional Cost text stays readable.
+function parseCostLine(line) {
+    const raw = line.replace(/\r$/, "");
+    const m = raw.match(/^(.*?)[:=]\s*৳?\s*(-?[\d][\d,.]*)\s*$/);
+    if (m) {
+        const amount = parseCostAmount(m[2]);
+        if (amount !== null) {
+            return { desc: m[1].replace(/[-–:]\s*$/, "").trim(), amount };
+        }
+    }
+    return { desc: raw.trim(), amount: null };
+}
+
+function parseRowsFromText(text) {
+    return (text || "").split("\n")
+        .filter(l => l.trim() !== "")
+        .map(l => ({ id: nextRowId(), ...parseCostLine(l) }));
+}
+
+// Mirrors parseCostLine's format so round-tripping through the row editor
+// keeps writing the same "Item = Amount" text into bazarCost/note — the
+// same fields & format /for-all reads.
+function serializeRows(rows) {
+    return rows
+        .filter(r => (r.desc && r.desc.trim() !== "") || r.amount !== null)
+        .map(r => {
+            const desc = (r.desc || "").trim();
+            if (r.amount !== null && Number.isFinite(r.amount)) {
+                return desc ? `${desc} = ${formatNumber(r.amount)}` : `${formatNumber(r.amount)} =`;
+            }
+            return desc;
+        })
+        .join("\n");
+}
+
+function sumRows(rows) {
+    return rows.reduce((s, r) => s + (Number.isFinite(r.amount) ? r.amount : 0), 0);
+}
+
+function renderCostRows(kind) {
+    const isBazar   = kind === "bazar";
+    const rows      = isBazar ? bazarRows : noteRows;
+    const container = isBazar ? bazarRowsContainer : notesRowsContainer;
+    const totalEl   = isBazar ? bazarCostTotalEl : notesCostTotalEl;
+    if (!container) return;
+
+    const editable = isManagerMode && !isReadOnlyForUser();
+    if (rows.length === 0) rows.push({ id: nextRowId(), desc: "", amount: null });
+
+    // Preserve focus/selection across a rebuild (e.g. the Firebase listener
+    // re-firing on our own save) so typing isn't interrupted.
+    const active = document.activeElement;
+    let focusInfo = null;
+    if (active && container.contains(active)) {
+        const rowEl = active.closest(".cost-row");
+        if (rowEl) {
+            focusInfo = {
+                rowId: rowEl.dataset.rowId,
+                field: active.classList.contains("cost-desc-input") ? "desc" : "amount",
+                selStart: active.selectionStart,
+                selEnd: active.selectionEnd
+            };
+        }
+    }
+
+    container.innerHTML = "";
+    rows.forEach(row => {
+        const rowEl = document.createElement("div");
+        rowEl.className = "cost-row";
+        rowEl.dataset.rowId = row.id;
+
+        const descInput = document.createElement("input");
+        descInput.type = "text";
+        descInput.className = "cost-desc-input";
+        descInput.placeholder = "Item / description";
+        descInput.value = row.desc || "";
+        descInput.disabled = !editable;
+
+        const amountWrap = document.createElement("div");
+        amountWrap.className = "cost-amount-wrap";
+        const currency = document.createElement("span");
+        currency.className = "cost-currency";
+        currency.textContent = "৳";
+        const amountInput = document.createElement("input");
+        amountInput.type = "number";
+        amountInput.className = "cost-amount-input";
+        amountInput.placeholder = "0";
+        amountInput.step = "any";
+        amountInput.value = row.amount !== null ? row.amount : "";
+        amountInput.disabled = !editable;
+        amountWrap.append(currency, amountInput);
+
+        const delBtn = document.createElement("button");
+        delBtn.type = "button";
+        delBtn.className = "cost-row-delete";
+        delBtn.title = "Remove row";
+        delBtn.innerHTML = '<i class="fas fa-times"></i>';
+        delBtn.disabled = !editable;
+
+        rowEl.append(descInput, amountWrap, delBtn);
+        container.appendChild(rowEl);
+    });
+
+    if (focusInfo) {
+        const rowEl  = container.querySelector(`.cost-row[data-row-id="${focusInfo.rowId}"]`);
+        const input  = rowEl && rowEl.querySelector(focusInfo.field === "desc" ? ".cost-desc-input" : ".cost-amount-input");
+        if (input) {
+            input.focus();
+            if (input.type === "text" && typeof input.setSelectionRange === "function") {
+                try { input.setSelectionRange(focusInfo.selStart, focusInfo.selEnd); } catch (e) {}
+            }
+        }
+    }
+
+    const addBtn = isBazar ? bazarAddRowBtn : notesAddRowBtn;
+    if (addBtn) addBtn.disabled = !editable;
+
+    if (totalEl) totalEl.textContent = `৳ ${formatNumber(sumRows(rows))}`;
+}
+
+function getCostState(kind) {
+    const isBazar = kind === "bazar";
+    return {
+        isBazar,
+        rows:        isBazar ? bazarRows : noteRows,
+        container:   isBazar ? bazarRowsContainer : notesRowsContainer,
+        totalEl:     isBazar ? bazarCostTotalEl : notesCostTotalEl,
+        saveKey:     isBazar ? "bazarCost" : "note",
+        debounceKey: isBazar ? "bazar-cost-text" : "note-text"
+    };
+}
+
+function saveCostRows(kind, showFeedback = false) {
+    const st = getCostState(kind);
+    const text = serializeRows(st.rows);
+    if (st.isBazar) bazarCostText = text; else monthNote = text;
+    return saveFields({ [st.saveKey]: text }, showFeedback);
+}
+
+function handleCostRowInput(kind, event) {
+    if (!isManagerMode || isReadOnlyForUser()) return;
+    const st = getCostState(kind);
+    const target = event.target;
+    const rowEl = target.closest(".cost-row");
+    if (!rowEl) return;
+    const idx = st.rows.findIndex(r => r.id === rowEl.dataset.rowId);
+    if (idx === -1) return;
+
+    if (target.classList.contains("cost-desc-input")) {
+        st.rows[idx].desc = target.value;
+    } else if (target.classList.contains("cost-amount-input")) {
+        st.rows[idx].amount = parseCostAmount(target.value);
+    } else {
+        return;
+    }
+
+    if (st.totalEl) st.totalEl.textContent = `৳ ${formatNumber(sumRows(st.rows))}`;
+
+    debounceKeyed(st.debounceKey, () => {
+        saveCostRows(kind).catch(err => { console.error(err); showMessage("Save failed", true); });
+    }, 350);
+}
+
+function handleCostRowBlur(kind, event) {
+    if (!isManagerMode || isReadOnlyForUser()) return;
+    const target = event.target;
+    if (!target.classList || (!target.classList.contains("cost-desc-input") && !target.classList.contains("cost-amount-input"))) return;
+    saveCostRows(kind, true).catch(err => { console.error(err); showMessage("Save failed", true); });
+}
+
+function handleCostRowClick(kind, event) {
+    const delBtn = event.target.closest(".cost-row-delete");
+    if (!delBtn) return;
+    if (!isManagerMode || isReadOnlyForUser()) return;
+    const st = getCostState(kind);
+    const rowEl = delBtn.closest(".cost-row");
+    const idx = st.rows.findIndex(r => r.id === rowEl?.dataset.rowId);
+    if (idx === -1) return;
+    st.rows.splice(idx, 1);
+    if (st.rows.length === 0) st.rows.push({ id: nextRowId(), desc: "", amount: null });
+    renderCostRows(kind);
+    saveCostRows(kind, true).catch(err => { console.error(err); showMessage("Save failed", true); });
+}
+
+function handleCostAddRow(kind) {
+    if (!isManagerMode || isReadOnlyForUser()) return;
+    const st = getCostState(kind);
+    const row = { id: nextRowId(), desc: "", amount: null };
+    st.rows.push(row);
+    renderCostRows(kind);
+    const input = st.container?.querySelector(`.cost-row[data-row-id="${row.id}"] .cost-desc-input`);
+    if (input) input.focus();
+}
+
+function handleCostRowKeydown(kind, event) {
+    if (event.key !== "Enter") return;
+    const target = event.target;
+    if (!target.classList.contains("cost-desc-input") && !target.classList.contains("cost-amount-input")) return;
+    event.preventDefault();
+    const st = getCostState(kind);
+    const rowEl = target.closest(".cost-row");
+    const idx = st.rows.findIndex(r => r.id === rowEl?.dataset.rowId);
+    if (idx === -1) return;
+
+    if (target.classList.contains("cost-desc-input")) {
+        rowEl.querySelector(".cost-amount-input")?.focus();
+        return;
+    }
+    if (idx === st.rows.length - 1) {
+        handleCostAddRow(kind);
+    } else {
+        st.container.children[idx + 1]?.querySelector(".cost-desc-input")?.focus();
+    }
 }
 
 function renderDeposits() {
@@ -545,27 +809,6 @@ function updateGrandTotal() {
     if (el) el.textContent = formatNumber(total);
     const el2 = document.getElementById("grand-total-cell");
     if (el2) el2.textContent = formatNumber(total);
-}
-
-// ── Note / bazar eval ─────────────────────────────────────────
-function evaluateNoteExpression(line) {
-    const match = line.match(/^([0-9+\-*/().\s]+=)\s*(?:.*)?$/);
-    if (!match) return line;
-    const expr = match[1].slice(0,-1).trim();
-    if (!expr) return line;
-    try {
-        const result = Function(`"use strict";return(${expr})`)();
-        if (!Number.isFinite(result)) return line;
-        return `${expr}=${formatNumber(result)}`;
-    } catch(e) { return line; }
-}
-
-function normalizeNoteText(value) {
-    return value.split("\n").map(line => {
-        const t = line.trim();
-        return (t.endsWith("=") || /^[0-9+\-*/().\s]+=/.test(t))
-            ? evaluateNoteExpression(t) : line;
-    }).join("\n");
 }
 
 // ── Persistence ───────────────────────────────────────────────
@@ -850,28 +1093,6 @@ async function handleFixedMealSave() {
     await saveFields({ fixedMeal }, true);
 }
 
-async function saveNoteText(raw, showFeedback=false) {
-    const n = normalizeNoteText(raw);
-    monthNote = n;
-    if (notesEditor && notesEditor.value!==n) {
-        const cur = notesEditor.selectionStart;
-        notesEditor.value = n;
-        if (typeof cur==="number") notesEditor.selectionStart = notesEditor.selectionEnd = Math.min(cur,n.length);
-    }
-    await saveFields({ note: n }, showFeedback);
-}
-
-async function saveBazarCostText(raw, showFeedback=false) {
-    const n = normalizeNoteText(raw);
-    bazarCostText = n;
-    if (bazarEditor && bazarEditor.value!==n) {
-        const cur = bazarEditor.selectionStart;
-        bazarEditor.value = n;
-        if (typeof cur==="number") bazarEditor.selectionStart = bazarEditor.selectionEnd = Math.min(cur,n.length);
-    }
-    await saveFields({ bazarCost: n }, showFeedback);
-}
-
 function handleDepositInputChange(event) {
     const input = event.target;
     if (!input.classList.contains("deposit-input")) return;
@@ -1074,27 +1295,21 @@ function bindEvents() {
         isDepositVisible=false; renderDeposits();
     });
 
-    if (bazarEditor) {
-        bazarEditor.addEventListener("input", ()=>{
-            if (!isManagerMode||isReadOnlyForUser()) { bazarEditor.value=bazarCostText; return; }
-            saveBazarCostText(bazarEditor.value).catch(console.error);
-        });
-        bazarEditor.addEventListener("blur", ()=>{
-            if (!isManagerMode||isReadOnlyForUser()) return;
-            saveBazarCostText(bazarEditor.value,true).catch(console.error);
-        });
+    if (bazarRowsContainer) {
+        bazarRowsContainer.addEventListener("input",   e => handleCostRowInput("bazar", e));
+        bazarRowsContainer.addEventListener("blur",    e => handleCostRowBlur("bazar", e), true);
+        bazarRowsContainer.addEventListener("click",   e => handleCostRowClick("bazar", e));
+        bazarRowsContainer.addEventListener("keydown", e => handleCostRowKeydown("bazar", e));
     }
+    if (bazarAddRowBtn) bazarAddRowBtn.addEventListener("click", () => handleCostAddRow("bazar"));
 
-    if (notesEditor) {
-        notesEditor.addEventListener("input", ()=>{
-            if (!isManagerMode||isReadOnlyForUser()) { notesEditor.value=monthNote; return; }
-            saveNoteText(notesEditor.value).catch(console.error);
-        });
-        notesEditor.addEventListener("blur", ()=>{
-            if (!isManagerMode||isReadOnlyForUser()) return;
-            saveNoteText(notesEditor.value,true).catch(console.error);
-        });
+    if (notesRowsContainer) {
+        notesRowsContainer.addEventListener("input",   e => handleCostRowInput("notes", e));
+        notesRowsContainer.addEventListener("blur",    e => handleCostRowBlur("notes", e), true);
+        notesRowsContainer.addEventListener("click",   e => handleCostRowClick("notes", e));
+        notesRowsContainer.addEventListener("keydown", e => handleCostRowKeydown("notes", e));
     }
+    if (notesAddRowBtn) notesAddRowBtn.addEventListener("click", () => handleCostAddRow("notes"));
 
     if (depositList) {
         depositList.addEventListener("input", handleDepositInputChange);

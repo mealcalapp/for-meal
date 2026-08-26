@@ -173,7 +173,16 @@
         </div>
         <button class="panel-close-btn" id="bazar-close-btn" title="Close">✕</button>
     </div>
-    <textarea id="bazar-editor" class="bazar-editor" placeholder="Write bazar costs here… (lines ending with = auto-calculate)"></textarea>
+    <div class="cost-editor" id="bazar-cost-editor">
+        <div class="cost-rows" id="bazar-rows"></div>
+        <div class="cost-add-row">
+            <button type="button" class="cost-add-btn" id="bazar-add-row-btn"><i class="fas fa-plus"></i> Add item</button>
+        </div>
+        <div class="cost-total-row">
+            <span>Total</span>
+            <strong id="bazar-cost-total">৳ 0</strong>
+        </div>
+    </div>
 </section>
 
 <!-- NOTES PANEL -->
@@ -185,7 +194,16 @@
         </div>
         <button class="panel-close-btn" id="notes-close-btn" title="Close">✕</button>
     </div>
-    <textarea id="notes-editor" class="notes-editor" placeholder="Write additional costs here… (lines ending with = auto-calculate)"></textarea>
+    <div class="cost-editor" id="notes-cost-editor">
+        <div class="cost-rows" id="notes-rows"></div>
+        <div class="cost-add-row">
+            <button type="button" class="cost-add-btn" id="notes-add-row-btn"><i class="fas fa-plus"></i> Add item</button>
+        </div>
+        <div class="cost-total-row">
+            <span>Total</span>
+            <strong id="notes-cost-total">৳ 0</strong>
+        </div>
+    </div>
 </section>
 
 <!-- DEPOSIT PANEL -->
