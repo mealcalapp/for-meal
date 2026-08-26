@@ -304,6 +304,15 @@ function renderNotes() {
 // ── Ruled notepad row editor (Bazar Cost / Additional Cost) ────
 function nextRowId() { return `r${++costRowSeq}`; }
 
+// Grows the description textarea to fit wrapped text (instead of letting
+// long item names run under the amount box) — resets to "auto" first so
+// it can shrink back down too when text is edited shorter.
+function autoResizeDescInput(el) {
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = el.scrollHeight + "px";
+}
+
 function parseCostAmount(str) {
     if (str === null || str === undefined) return null;
     const cleaned = String(str).replace(/,/g, "").trim();
@@ -386,8 +395,8 @@ function renderCostRows(kind) {
         rowEl.className = "cost-row";
         rowEl.dataset.rowId = row.id;
 
-        const descInput = document.createElement("input");
-        descInput.type = "text";
+        const descInput = document.createElement("textarea");
+        descInput.rows = 1;
         descInput.className = "cost-desc-input";
         descInput.placeholder = "Item / description";
         descInput.value = row.desc || "";
@@ -416,6 +425,7 @@ function renderCostRows(kind) {
 
         rowEl.append(descInput, amountWrap, delBtn);
         container.appendChild(rowEl);
+        autoResizeDescInput(descInput);
     });
 
     if (focusInfo) {
@@ -465,6 +475,7 @@ function handleCostRowInput(kind, event) {
 
     if (target.classList.contains("cost-desc-input")) {
         st.rows[idx].desc = target.value;
+        autoResizeDescInput(target);
     } else if (target.classList.contains("cost-amount-input")) {
         st.rows[idx].amount = parseCostAmount(target.value);
     } else {
@@ -1310,6 +1321,11 @@ function bindEvents() {
         notesRowsContainer.addEventListener("keydown", e => handleCostRowKeydown("notes", e));
     }
     if (notesAddRowBtn) notesAddRowBtn.addEventListener("click", () => handleCostAddRow("notes"));
+
+    // Re-wrap description rows on resize/rotation, since wrap width changes.
+    window.addEventListener("resize", () => {
+        document.querySelectorAll(".cost-desc-input").forEach(autoResizeDescInput);
+    });
 
     if (depositList) {
         depositList.addEventListener("input", handleDepositInputChange);
