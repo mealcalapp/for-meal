@@ -334,7 +334,11 @@ function parseCostLine(line) {
             return { desc: m[1].replace(/[-–:]\s*$/, "").trim(), amount };
         }
     }
-    return { desc: raw.trim(), amount: null };
+    let desc = raw.trim();
+    // Strip the "- " marker serializeRows adds to description-only lines
+    // (see there for why) so it doesn't show up in the item box on reload.
+    if (desc.startsWith("- ")) desc = desc.slice(2).trim();
+    return { desc, amount: null };
 }
 
 function parseRowsFromText(text) {
@@ -344,17 +348,21 @@ function parseRowsFromText(text) {
 }
 
 // Mirrors parseCostLine's format so round-tripping through the row editor
-// keeps writing the same "Item = Amount" text into bazarCost/note — the
-// same fields & format /for-all reads.
+// keeps writing into the same bazarCost/note text fields /for-all reads.
+// /for-all's totals page sums any line containing "=<number>" AND any
+// line that is a bare stand-alone number — so a description-only row
+// (no amount entered yet) is always prefixed with "- " to guarantee it's
+// neither, otherwise typing a plain number as an item name would get
+// silently counted into the total there.
 function serializeRows(rows) {
     return rows
         .filter(r => (r.desc && r.desc.trim() !== "") || r.amount !== null)
         .map(r => {
             const desc = (r.desc || "").trim();
             if (r.amount !== null && Number.isFinite(r.amount)) {
-                return desc ? `${desc} = ${formatNumber(r.amount)}` : `${formatNumber(r.amount)} =`;
+                return desc ? `${desc} = ${formatNumber(r.amount)}` : `= ${formatNumber(r.amount)}`;
             }
-            return desc;
+            return `- ${desc}`;
         })
         .join("\n");
 }
