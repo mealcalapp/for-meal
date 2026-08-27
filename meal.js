@@ -320,6 +320,19 @@ function autoResizeDescInput(el) {
     el.style.height = el.scrollHeight + "px";
 }
 
+// /for-all's totals page scans each saved line for a literal ASCII "="
+// followed by digits, ANYWHERE in the line — not just the amount we
+// intentionally write. So a stray "=" the user types into the
+// description itself (e.g. testing "=500") would still get counted as
+// a real cost there even with the "- " prefix below. Swap it for a
+// look-alike full-width "＝" (different character, same look) whenever
+// it's not our own deliberate amount marker, and swap back on read —
+// so what the manager sees is untouched, but only a genuine amount
+// (from the ৳ box) can ever reach /for-all's total.
+const STORAGE_EQUALS_ESCAPE = "＝";
+function escapeDescForStorage(desc) { return (desc || "").replace(/=/g, STORAGE_EQUALS_ESCAPE); }
+function unescapeDescFromStorage(desc) { return (desc || "").replace(/＝/g, "="); }
+
 function parseCostAmount(str) {
     if (str === null || str === undefined) return null;
     const cleaned = String(str).replace(/,/g, "").trim();
@@ -338,14 +351,14 @@ function parseCostLine(line) {
     if (m) {
         const amount = parseCostAmount(m[2]);
         if (amount !== null) {
-            return { desc: m[1].replace(/[-–:]\s*$/, "").trim(), amount };
+            return { desc: unescapeDescFromStorage(m[1].replace(/[-–:]\s*$/, "").trim()), amount };
         }
     }
     let desc = raw.trim();
     // Strip the "- " marker serializeRows adds to description-only lines
     // (see there for why) so it doesn't show up in the item box on reload.
     if (desc.startsWith("- ")) desc = desc.slice(2).trim();
-    return { desc, amount: null };
+    return { desc: unescapeDescFromStorage(desc), amount: null };
 }
 
 function parseRowsFromText(text) {
@@ -365,7 +378,7 @@ function serializeRows(rows) {
     return rows
         .filter(r => (r.desc && r.desc.trim() !== "") || r.amount !== null)
         .map(r => {
-            const desc = (r.desc || "").trim();
+            const desc = escapeDescForStorage((r.desc || "").trim());
             if (r.amount !== null && Number.isFinite(r.amount)) {
                 return desc ? `${desc} = ${formatNumber(r.amount)}` : `= ${formatNumber(r.amount)}`;
             }
