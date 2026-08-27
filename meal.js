@@ -325,7 +325,7 @@ function parseCostAmount(str) {
     const cleaned = String(str).replace(/,/g, "").trim();
     if (cleaned === "") return null;
     const n = Number(cleaned);
-    return Number.isFinite(n) ? n : null;
+    return Number.isFinite(n) && n >= 0 ? n : null;
 }
 
 // Best-effort parse of a saved text line into {desc, amount}. Understands
@@ -426,6 +426,7 @@ function renderCostRows(kind) {
         amountInput.type = "number";
         amountInput.className = "cost-amount-input";
         amountInput.placeholder = "0";
+        amountInput.min = "0";
         amountInput.step = "any";
         amountInput.value = row.amount !== null ? row.amount : "";
         amountInput.disabled = !editable;
@@ -561,6 +562,16 @@ function renderDeposits() {
     depositPanel.classList.toggle("visible", isDepositVisible);
     depositData = normalizeDeposits(depositData, numPeople);
 
+    // Same fix as the table/cost rows: don't tear down a deposit input
+    // while the manager is actively typing in it (echo of our own or
+    // another device's save). The total already stays live via
+    // handleDepositInputChange, so just skip the rebuild until they
+    // move to a different field.
+    if (document.activeElement && depositList.contains(document.activeElement)) {
+        updateDepositTotal();
+        return;
+    }
+
     depositList.innerHTML = "";
     mealData.forEach((person, pi) => {
         const row = document.createElement("div");
@@ -600,38 +611,24 @@ function updateDepositTotal() {
 
 // ── Table rendering ───────────────────────────────────────────
 function renderTable() {
-    // Capture what the user is actively typing in, so a table rebuild
-    // triggered by a remote update (their own save echoing back, or the
-    // other manager/admin's edit) doesn't kick them out of the field.
+    // While actively editing a meal count or a name cell, skip the
+    // rebuild entirely — the same fix as Bazar/Additional Cost above.
+    // Every save (ours or another manager's) echoes back through the
+    // Firebase listener → updateManagerUI() → here, and a full rebuild
+    // mid-keystroke is what causes the cursor to jump / keyboard to
+    // flicker on mobile. Local handlers (handleMealInputChange /
+    // handleNameInputChange) already update totals live without needing
+    // this render, so it's safe to just wait until the field is blurred.
     const active = document.activeElement;
-    let focusInfo = null;
-    if (active && table.contains(active) && active.tagName === "INPUT") {
-        focusInfo = {
-            value:    active.value,
-            selStart: active.selectionStart,
-            selEnd:   active.selectionEnd,
-            person:   active.dataset.person,
-            day:      active.dataset.day,
-            type:     active.dataset.type,
-            isName:   active.classList.contains("name-input")
-        };
+    if (active && table.contains(active) &&
+        (active.classList.contains("meal-input") || active.classList.contains("name-input"))) {
+        return;
     }
 
     table.innerHTML = "";
     renderTableHeader();
     renderTableBody();
     scrollTodayColumnIntoView();
-
-    if (focusInfo) {
-        const sel = focusInfo.isName
-            ? table.querySelector(`.name-input[data-person="${focusInfo.person}"]`)
-            : table.querySelector(`.meal-input[data-person="${focusInfo.person}"][data-day="${focusInfo.day}"][data-type="${focusInfo.type}"]`);
-        if (sel) {
-            sel.value = focusInfo.value;
-            sel.focus();
-            try { sel.setSelectionRange(focusInfo.selStart, focusInfo.selEnd); } catch(e) {}
-        }
-    }
 }
 
 function scrollTodayColumnIntoView() {
