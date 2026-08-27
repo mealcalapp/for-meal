@@ -645,7 +645,6 @@ function renderTable() {
 }
 
 function scrollTodayColumnIntoView() {
-    if (!window.matchMedia('(max-width: 768px)').matches) return;
     const container = document.getElementById('table-container');
     if (!container) return;
     const todayHeader = table.querySelector('th.today-col');
