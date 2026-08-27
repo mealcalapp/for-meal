@@ -280,9 +280,15 @@ function renderBazarCost() {
         bazarEditor.value = bazarCostText;
         bazarEditor.disabled = !isManagerMode || isReadOnlyForUser();
     }
-    // Only reparse from the stored text when it actually changed elsewhere
-    // (new month loaded, remote edit) — not on every echo of our own save,
-    // so we don't rebuild the rows out from under the manager's cursor.
+    // While the manager is actively typing inside a row, skip rebuilding
+    // the DOM entirely — a Firebase echo of our own (debounced) save would
+    // otherwise tear down and recreate the focused input mid-keystroke,
+    // which is what causes the cursor to jump/keyboard to flicker on
+    // mobile. The row already shows what they typed; the save still
+    // happens in the background regardless. We pick up any genuinely
+    // remote change once they move away from the field (blur → save →
+    // next render finds nothing focused here and reparses normally).
+    if (bazarRowsContainer && bazarRowsContainer.contains(document.activeElement)) return;
     if (serializeRows(bazarRows) !== bazarCostText) {
         bazarRows = parseRowsFromText(bazarCostText);
     }
@@ -295,6 +301,7 @@ function renderNotes() {
         notesEditor.value = monthNote;
         notesEditor.disabled = !isManagerMode || isReadOnlyForUser();
     }
+    if (notesRowsContainer && notesRowsContainer.contains(document.activeElement)) return;
     if (serializeRows(noteRows) !== monthNote) {
         noteRows = parseRowsFromText(monthNote);
     }
