@@ -364,32 +364,45 @@ input[type=number]::-webkit-inner-spin-button {
     margin: 0;
 }
 
-/* ── DAY MARK (manager/super admin: mark a member's meal/guest
-   cell for a date as "off" — e.g. no cooking that day, or that
-   member's meal was off — visible to everyone, editable by
-   manager only) ───────────────────────────────────────────── */
-.day-marked {
-    background-color: #fde68a !important;
-    box-shadow: inset 0 0 0 1px #f59e0b;
-}
-.guest-row td.day-marked { background-color: #fcd34d !important; }
+/* ── HIGHLIGHT DOTS & TINTED CELLS (manager mark) ─────────────── */
+.meal-cell { position: relative; }
 
-.mark-toggle-btn {
-    background: rgba(255,255,255,0.14);
-    border: 1px solid rgba(255,255,255,0.25);
-    transition: background 0.2s;
+/* Soft tint — kept light so the meal number on top stays easy to read */
+.meal-cell.hl-yellow {
+    background: rgba(250, 204, 21, 0.26) !important;
+    box-shadow: inset 0 0 0 1px rgba(202, 138, 4, 0.35);
 }
-.mark-toggle-btn:hover { background: rgba(255,255,255,0.24); }
-.mark-toggle-btn.mark-mode-on {
-    background: #f59e0b !important;
-    border-color: #f59e0b !important;
-    box-shadow: 0 0 0 2px rgba(245,158,11,0.35);
+.meal-cell.hl-red {
+    background: rgba(239, 68, 68, 0.20) !important;
+    box-shadow: inset 0 0 0 1px rgba(190, 18, 60, 0.4);
 }
 
-/* While mark mode is on, clicks on a day cell toggle the highlight
-   instead of focusing the number input underneath it. */
-.mark-mode-active .meal-input { pointer-events: none; cursor: pointer; }
-.mark-mode-active td { cursor: pointer; }
+.hl-dots {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+
+.hl-dot {
+    position: absolute;
+    bottom: 2px;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    cursor: pointer;
+    pointer-events: auto;
+    z-index: 3;
+    box-shadow: 0 0 0 1px rgba(255,255,255,0.75);
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.hl-dot:hover { transform: scale(1.5); }
+
+.hl-dot-yellow { left: 2px; background: #eab308; }
+.hl-dot-red    { right: 2px; background: #ef4444; }
+
+.hl-dot.active {
+    box-shadow: 0 0 0 1.5px #fff, 0 0 0 3px rgba(15, 23, 42, 0.55);
+}
 
 /* ── NOTES, BAZAR & DEPOSIT PANELS ──────────────────────────── */
 .notes-panel, .bazar-panel, .deposit-panel {

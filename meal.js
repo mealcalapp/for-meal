@@ -52,7 +52,6 @@ const notesEditor         = document.getElementById("notes-editor");
 const notesRowsContainer  = document.getElementById("notes-rows");
 const notesAddRowBtn      = document.getElementById("notes-add-row-btn");
 const notesCostTotalEl    = document.getElementById("notes-cost-total");
-const markToggleBtn       = document.getElementById("mark-toggle-btn");
 const depositToggleBtn    = document.getElementById("deposit-toggle-btn");
 const depositPanel        = document.getElementById("deposit-panel");
 const depositList         = document.getElementById("deposit-list");
@@ -77,7 +76,6 @@ let isManagerMode      = false;
 let isBazarVisible     = false;
 let isNoteVisible      = false;
 let isDepositVisible   = false;
-let isMarkModeActive   = false;  // manager-only local UI mode: click a day cell to mark it off
 let bazarCostText      = "";
 let monthNote          = "";
 let bazarRows          = [];   // parsed rows for the Bazar Cost notepad editor
@@ -139,12 +137,9 @@ function getDefaultMember(i) {
         guestMeals: Array(MAX_DAYS).fill(0),
         mealLocked: Array(MAX_DAYS).fill(false),
         guestMealLocked: Array(MAX_DAYS).fill(false),
-        fixedMealOff: false,
-        // Manager-set visual mark per day (e.g. "no cooking that day" or
-        // "this member's meal was off that day"). Purely a highlight —
-        // doesn't affect totals/billing — visible to everyone, editable
-        // by manager/super admin only.
-        dayMark: Array(MAX_DAYS).fill(false)
+        mealHighlight: Array(MAX_DAYS).fill(""),
+        guestMealHighlight: Array(MAX_DAYS).fill(""),
+        fixedMealOff: false
     };
 }
 
@@ -166,8 +161,9 @@ function normalizeMember(m, i) {
         guestMeals: normalizeArray(s.guestMeals,MAX_DAYS,0).map(parseInput),
         mealLocked: normalizeArray(s.mealLocked,MAX_DAYS,false).map(Boolean),
         guestMealLocked: normalizeArray(s.guestMealLocked,MAX_DAYS,false).map(Boolean),
-        fixedMealOff: Boolean(s.fixedMealOff),
-        dayMark: normalizeArray(s.dayMark,MAX_DAYS,false).map(Boolean)
+        mealHighlight: normalizeArray(s.mealHighlight,MAX_DAYS,"").map(v => (v==="yellow"||v==="red") ? v : ""),
+        guestMealHighlight: normalizeArray(s.guestMealHighlight,MAX_DAYS,"").map(v => (v==="yellow"||v==="red") ? v : ""),
+        fixedMealOff: Boolean(s.fixedMealOff)
     };
 }
 
@@ -243,15 +239,6 @@ function updateManagerUI() {
     // Manager-only controls
     fixedMealSaveBtn.classList.toggle("hidden", !isManager);
     managerOnlyMembers.classList.toggle("hidden", !isManager);
-    if (markToggleBtn) {
-        markToggleBtn.classList.toggle("hidden", !isManager);
-        markToggleBtn.disabled = !isManager || readOnly;
-    }
-    // Mark mode only ever makes sense while actively a manager on an
-    // editable (non read-only) month — drop it otherwise so a stale
-    // "on" state can't linger after logout / switching to history.
-    if (!isManager || readOnly) isMarkModeActive = false;
-    updateMarkModeUI();
 
     // Disable/enable inputs
     fixedMealInput.disabled  = !isManager || readOnly;
@@ -695,46 +682,6 @@ function renderTableHeader() {
     row.insertCell().outerHTML = '<th class="sticky-col-right sticky-header text-center p-2" style="min-width:90px;">Total<br><span id="grand-total" class="font-bold text-cyan-300">0</span></th>';
 }
 
-// ── Day Mark (manager: highlight a member's day as "off") ──────
-function updateMarkModeUI() {
-    table.classList.toggle("mark-mode-active", isMarkModeActive);
-    if (markToggleBtn) markToggleBtn.classList.toggle("mark-mode-on", isMarkModeActive);
-}
-
-// Delegated on the table element itself (survives table.innerHTML
-// rebuilds on re-render, unlike listeners on individual cells).
-function handleTableCellMarkClick(event) {
-    if (!isMarkModeActive || !isManagerMode || isReadOnlyForUser()) return;
-    const cell = event.target.closest("td");
-    if (!cell) return;
-    const input = cell.querySelector(".meal-input");
-    if (!input) return; // serial/name/total cells etc. — nothing to mark
-    const pi = parseInt(input.dataset.person, 10);
-    const di = parseInt(input.dataset.day, 10);
-    if (!Number.isInteger(pi) || !Number.isInteger(di) || !mealData[pi]) return;
-    toggleDayMark(pi, di);
-}
-
-// Toggles the highlight for both the meal cell AND the guest-meal cell
-// of that member/day (they share the same data-person/data-day), which
-// is what makes the highlight read as one vertical marked block.
-function toggleDayMark(pi, di) {
-    const member = mealData[pi];
-    if (!member) return;
-    member.dayMark[di] = !member.dayMark[di];
-    applyDayMarkClasses(pi, di);
-    saveFields({ [`members/${pi}/dayMark/${di}`]: member.dayMark[di] })
-        .catch(err => { console.error(err); showMessage("Mark save failed", true); });
-}
-
-function applyDayMarkClasses(pi, di) {
-    const marked = Boolean(mealData[pi]?.dayMark?.[di]);
-    table.querySelectorAll(`.meal-input[data-person="${pi}"][data-day="${di}"]`).forEach(input => {
-        const td = input.closest("td");
-        if (td) td.classList.toggle("day-marked", marked);
-    });
-}
-
 function createMealInput(personIndex, dayIndex, type, value, locked) {
     const input = document.createElement("input");
     input.type = "number";
@@ -751,6 +698,64 @@ function createMealInput(personIndex, dayIndex, type, value, locked) {
     if (input.disabled) input.classList.add("locked-input");
     input.addEventListener("input", handleMealInputChange);
     return input;
+}
+
+// ── Highlight dots (manager/super-admin only) ───────────────────
+// Small yellow/red corner dots on a meal cell. Manager clicks a dot to
+// tint the whole cell that color (click again to clear it). The tint
+// itself is saved to Firebase and shown to every viewer — only the
+// clickable dots are manager-only.
+function applyHighlightUI(cell, personIndex, dayIndex, type, highlight) {
+    cell.classList.remove("hl-yellow", "hl-red");
+    if (highlight === "yellow" || highlight === "red") cell.classList.add(`hl-${highlight}`);
+
+    if (!isManagerMode || isReadOnlyForUser()) return; // read-only viewers just see the tint
+
+    const dots = document.createElement("span");
+    dots.className = "hl-dots";
+
+    const yellowDot = document.createElement("span");
+    yellowDot.className = "hl-dot hl-dot-yellow" + (highlight === "yellow" ? " active" : "");
+    yellowDot.title = "Mark yellow";
+
+    const redDot = document.createElement("span");
+    redDot.className = "hl-dot hl-dot-red" + (highlight === "red" ? " active" : "");
+    redDot.title = "Mark red";
+
+    yellowDot.addEventListener("click", (e) => {
+        e.stopPropagation();
+        toggleHighlight(cell, personIndex, dayIndex, type, "yellow", yellowDot, redDot);
+    });
+    redDot.addEventListener("click", (e) => {
+        e.stopPropagation();
+        toggleHighlight(cell, personIndex, dayIndex, type, "red", yellowDot, redDot);
+    });
+
+    dots.appendChild(yellowDot);
+    dots.appendChild(redDot);
+    cell.appendChild(dots);
+}
+
+function toggleHighlight(cell, personIndex, dayIndex, type, color, yellowDot, redDot) {
+    if (!isManagerMode || isReadOnlyForUser()) return;
+    const member = mealData[personIndex];
+    if (!member) return;
+
+    const key     = type === "meal" ? "mealHighlight" : "guestMealHighlight";
+    const current = member[key][dayIndex];
+    const next    = current === color ? "" : color; // clicking the active color clears it
+
+    member[key][dayIndex] = next;
+
+    cell.classList.remove("hl-yellow", "hl-red");
+    if (next) cell.classList.add(`hl-${next}`);
+    yellowDot.classList.toggle("active", next === "yellow");
+    redDot.classList.toggle("active", next === "red");
+
+    debounceKeyed(`hl-${personIndex}-${dayIndex}-${type}`, () => {
+        saveFields({ [`members/${personIndex}/${key}/${dayIndex}`]: next })
+            .catch(err => { console.error(err); showMessage("Save failed", true); });
+    }, 250);
 }
 
 function renderTableBody() {
@@ -786,9 +791,10 @@ function renderTableBody() {
         // Meal cells
         for (let d=0; d<selectedMonthDays; d++) {
             const cell = mealRow.insertCell();
+            cell.classList.add("meal-cell");
             const locked = person.mealLocked[d] && !isManagerMode;
-            if (person.dayMark[d]) cell.classList.add("day-marked");
             cell.appendChild(createMealInput(pi, d, "meal", person.meals[d], locked));
+            applyHighlightUI(cell, pi, d, "meal", person.mealHighlight[d]);
         }
 
         // Total display (rowSpan 2)
@@ -809,9 +815,10 @@ function renderTableBody() {
 
         for (let d=0; d<selectedMonthDays; d++) {
             const cell = guestRow.insertCell();
+            cell.classList.add("meal-cell");
             const locked = person.guestMealLocked[d] && !isManagerMode;
-            if (person.dayMark[d]) cell.classList.add("day-marked");
             cell.appendChild(createMealInput(pi, d, "guest", person.guestMeals[d], locked));
+            applyHighlightUI(cell, pi, d, "guest", person.guestMealHighlight[d]);
         }
     });
 
@@ -1378,19 +1385,6 @@ function bindEvents() {
             depositPanel.scrollIntoView({behavior:"smooth",block:"start"});
         });
     }
-
-    if (markToggleBtn) {
-        markToggleBtn.addEventListener("click", ()=>{
-            if (!isManagerMode || isReadOnlyForUser()) return;
-            isMarkModeActive = !isMarkModeActive;
-            updateMarkModeUI();
-            showMessage(isMarkModeActive ? "Mark mode on — tap a cell to mark/unmark" : "Mark mode off");
-        });
-    }
-    // Delegated once on the table itself so it keeps working across
-    // every renderTable() rebuild (table.innerHTML gets replaced, but
-    // the <table> element and its listeners persist).
-    table.addEventListener("click", handleTableCellMarkClick);
 
     document.getElementById("notes-close-btn").addEventListener("click",()=>{
         isNoteVisible=false; renderNotes();
