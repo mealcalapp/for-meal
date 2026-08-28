@@ -86,6 +86,7 @@ let selectedMonthDate  = monthStart(new Date());
 let selectedMonthDays  = getDaysInMonth(selectedMonthDate);
 let currentUser        = null;   // firebase.auth().currentUser
 let storedManagerEmail = "";     // from Firebase for the selected month
+let paintMode           = null;  // null | "yellow" | "red" — active color for the manager's day-status painter
 
 // ── Date helpers ──────────────────────────────────────────────
 function monthStart(date) { return new Date(date.getFullYear(), date.getMonth(), 1); }
@@ -137,8 +138,8 @@ function getDefaultMember(i) {
         guestMeals: Array(MAX_DAYS).fill(0),
         mealLocked: Array(MAX_DAYS).fill(false),
         guestMealLocked: Array(MAX_DAYS).fill(false),
-        mealHighlight: Array(MAX_DAYS).fill(""),
-        guestMealHighlight: Array(MAX_DAYS).fill(""),
+        mealStatus: Array(MAX_DAYS).fill(""),        // "" | "yellow" | "red" per day, meal cell
+        guestMealStatus: Array(MAX_DAYS).fill(""),   // "" | "yellow" | "red" per day, guest-meal cell
         fixedMealOff: false
     };
 }
@@ -147,6 +148,16 @@ function normalizeArray(raw, len, def) {
     const src = Array.isArray(raw)?raw:[];
     const out = src.slice(0,len);
     while(out.length<len) out.push(def);
+    return out;
+}
+
+// Only "yellow" / "red" are ever valid — anything else (missing, corrupt,
+// stray value) normalizes to "" (no status) so a bad value can never paint
+// a cell unexpectedly.
+function normalizeStatusArray(raw, len) {
+    const src = Array.isArray(raw) ? raw : [];
+    const out = src.slice(0, len).map(v => (v === "yellow" || v === "red") ? v : "");
+    while (out.length < len) out.push("");
     return out;
 }
 
@@ -161,8 +172,8 @@ function normalizeMember(m, i) {
         guestMeals: normalizeArray(s.guestMeals,MAX_DAYS,0).map(parseInput),
         mealLocked: normalizeArray(s.mealLocked,MAX_DAYS,false).map(Boolean),
         guestMealLocked: normalizeArray(s.guestMealLocked,MAX_DAYS,false).map(Boolean),
-        mealHighlight: normalizeArray(s.mealHighlight,MAX_DAYS,"").map(v => (v==="yellow"||v==="red") ? v : ""),
-        guestMealHighlight: normalizeArray(s.guestMealHighlight,MAX_DAYS,"").map(v => (v==="yellow"||v==="red") ? v : ""),
+        mealStatus: normalizeStatusArray(s.mealStatus, MAX_DAYS),
+        guestMealStatus: normalizeStatusArray(s.guestMealStatus, MAX_DAYS),
         fixedMealOff: Boolean(s.fixedMealOff)
     };
 }
@@ -680,15 +691,105 @@ function renderTableHeader() {
     }
 
     row.insertCell().outerHTML = '<th class="sticky-col-right sticky-header text-center p-2" style="min-width:90px;">Total<br><span id="grand-total" class="font-bold text-cyan-300">0</span></th>';
+
+    // Day-status painter row — Super Admin / Manager only. Everyone else
+    // still SEES the yellow/red marks on cells (rendered in renderTableBody);
+    // they just don't get this control row to set them.
+    if (isManagerMode) renderPaintModeRow(head);
 }
 
-function createMealInput(personIndex, dayIndex, type, value, locked) {
+// Adds one row under the date header with two toggle buttons ("Meal Off" /
+// "Ranna Hoyni"). Clicking a button arms that color; while armed, clicking
+// ANY member's meal or guest-meal box paints that single box (see
+// handlePaintMouseDown/handleCellPaint) instead of editing it. Clicking the
+// same button again disarms — normal editing resumes.
+function renderPaintModeRow(head) {
+    const readOnly = isReadOnlyForUser();
+    const row = head.insertRow();
+    row.classList.add("paint-mode-row");
+
+    const ctrlCell = row.insertCell();
+    ctrlCell.colSpan = 2;
+    ctrlCell.classList.add("sticky-col-left", "paint-mode-ctrl");
+
+    const yellowBtn = document.createElement("button");
+    yellowBtn.type = "button";
+    yellowBtn.className = "paint-mode-btn paint-yellow" + (paintMode === "yellow" ? " active" : "");
+    yellowBtn.innerHTML = '<i class="fas fa-circle"></i> Meal Off';
+    yellowBtn.title = "Click, then tap any meal/guest box to mark it Meal Off";
+    yellowBtn.disabled = readOnly;
+    yellowBtn.addEventListener("click", () => togglePaintMode("yellow"));
+
+    const redBtn = document.createElement("button");
+    redBtn.type = "button";
+    redBtn.className = "paint-mode-btn paint-red" + (paintMode === "red" ? " active" : "");
+    redBtn.innerHTML = '<i class="fas fa-circle"></i> Ranna Hoyni';
+    redBtn.title = "Click, then tap any meal/guest box to mark it Ranna Hoyni";
+    redBtn.disabled = readOnly;
+    redBtn.addEventListener("click", () => togglePaintMode("red"));
+
+    ctrlCell.append(yellowBtn, redBtn);
+
+    const hintCell = row.insertCell();
+    hintCell.colSpan = selectedMonthDays + 1;
+    hintCell.classList.add("paint-mode-hint");
+    hintCell.textContent = readOnly
+        ? "History is read-only."
+        : (paintMode
+            ? `Tap any box below to mark it — tap "${paintMode === "yellow" ? "Meal Off" : "Ranna Hoyni"}" again to stop.`
+            : "Pick a color, then tap any member's box to mark that day.");
+}
+
+function togglePaintMode(mode) {
+    if (!isManagerMode || isReadOnlyForUser()) return;
+    paintMode = (paintMode === mode) ? null : mode;
+    renderTable();
+}
+
+// Intercepts the mousedown BEFORE the input would focus/enter edit mode,
+// so painting never accidentally opens the number field for typing.
+function handlePaintMouseDown(event) {
+    if (!isManagerMode || isReadOnlyForUser() || !paintMode) return;
+    event.preventDefault();
+    const input = event.currentTarget;
+    const pi   = parseInt(input.dataset.person, 10);
+    const di   = parseInt(input.dataset.day, 10);
+    const type = input.dataset.type;
+    handleCellPaint(pi, di, type);
+}
+
+// Toggles a single cell's status: same color clicked again clears it,
+// a different color (or none) sets it to the armed color. Updates the DOM
+// instantly (no full table rebuild), then syncs just that one field so
+// other viewers and history pick it up.
+function handleCellPaint(pi, di, type) {
+    const member = mealData[pi];
+    if (!member) return;
+    const statusKey = type === "meal" ? "mealStatus" : "guestMealStatus";
+    if (!Array.isArray(member[statusKey])) member[statusKey] = Array(MAX_DAYS).fill("");
+
+    const current = member[statusKey][di] || "";
+    const next = current === paintMode ? "" : paintMode;
+    member[statusKey][di] = next;
+
+    const input = table.querySelector(`.meal-input[data-person="${pi}"][data-day="${di}"][data-type="${type}"]`);
+    if (input) {
+        input.classList.remove("cell-status-yellow", "cell-status-red");
+        if (next) input.classList.add(`cell-status-${next}`);
+    }
+
+    saveFields({ [`members/${pi}/${statusKey}/${di}`]: next })
+        .catch(err => { console.error(err); showMessage("Mark save failed", true); });
+}
+
+function createMealInput(personIndex, dayIndex, type, value, locked, status) {
     const input = document.createElement("input");
     input.type = "number";
     input.min  = "0";
     input.step = "0.5";
     const isToday = isCurrentMonthView() && (dayIndex+1)===getTodayDay();
     input.className = `meal-input ${type==="meal"?"text-gray-800":"text-pink-700"}${isToday?" today-col":""}`;
+    if (status === "yellow" || status === "red") input.classList.add(`cell-status-${status}`);
     input.dataset.person = String(personIndex);
     input.dataset.day    = String(dayIndex);
     input.dataset.type   = type;
@@ -697,65 +798,10 @@ function createMealInput(personIndex, dayIndex, type, value, locked) {
     input.disabled = !isManagerMode || locked || isReadOnlyForUser();
     if (input.disabled) input.classList.add("locked-input");
     input.addEventListener("input", handleMealInputChange);
+    // Day-status painter: when a manager/super admin has a color armed
+    // (paintMode), clicking any box paints it instead of editing it.
+    input.addEventListener("mousedown", handlePaintMouseDown);
     return input;
-}
-
-// ── Highlight dots (manager/super-admin only) ───────────────────
-// Small yellow/red corner dots on a meal cell. Manager clicks a dot to
-// tint the whole cell that color (click again to clear it). The tint
-// itself is saved to Firebase and shown to every viewer — only the
-// clickable dots are manager-only.
-function applyHighlightUI(cell, personIndex, dayIndex, type, highlight) {
-    cell.classList.remove("hl-yellow", "hl-red");
-    if (highlight === "yellow" || highlight === "red") cell.classList.add(`hl-${highlight}`);
-
-    if (!isManagerMode || isReadOnlyForUser()) return; // read-only viewers just see the tint
-
-    const dots = document.createElement("span");
-    dots.className = "hl-dots";
-
-    const yellowDot = document.createElement("span");
-    yellowDot.className = "hl-dot hl-dot-yellow" + (highlight === "yellow" ? " active" : "");
-    yellowDot.title = "Mark yellow";
-
-    const redDot = document.createElement("span");
-    redDot.className = "hl-dot hl-dot-red" + (highlight === "red" ? " active" : "");
-    redDot.title = "Mark red";
-
-    yellowDot.addEventListener("click", (e) => {
-        e.stopPropagation();
-        toggleHighlight(cell, personIndex, dayIndex, type, "yellow", yellowDot, redDot);
-    });
-    redDot.addEventListener("click", (e) => {
-        e.stopPropagation();
-        toggleHighlight(cell, personIndex, dayIndex, type, "red", yellowDot, redDot);
-    });
-
-    dots.appendChild(yellowDot);
-    dots.appendChild(redDot);
-    cell.appendChild(dots);
-}
-
-function toggleHighlight(cell, personIndex, dayIndex, type, color, yellowDot, redDot) {
-    if (!isManagerMode || isReadOnlyForUser()) return;
-    const member = mealData[personIndex];
-    if (!member) return;
-
-    const key     = type === "meal" ? "mealHighlight" : "guestMealHighlight";
-    const current = member[key][dayIndex];
-    const next    = current === color ? "" : color; // clicking the active color clears it
-
-    member[key][dayIndex] = next;
-
-    cell.classList.remove("hl-yellow", "hl-red");
-    if (next) cell.classList.add(`hl-${next}`);
-    yellowDot.classList.toggle("active", next === "yellow");
-    redDot.classList.toggle("active", next === "red");
-
-    debounceKeyed(`hl-${personIndex}-${dayIndex}-${type}`, () => {
-        saveFields({ [`members/${personIndex}/${key}/${dayIndex}`]: next })
-            .catch(err => { console.error(err); showMessage("Save failed", true); });
-    }, 250);
 }
 
 function renderTableBody() {
@@ -791,10 +837,9 @@ function renderTableBody() {
         // Meal cells
         for (let d=0; d<selectedMonthDays; d++) {
             const cell = mealRow.insertCell();
-            cell.classList.add("meal-cell");
             const locked = person.mealLocked[d] && !isManagerMode;
-            cell.appendChild(createMealInput(pi, d, "meal", person.meals[d], locked));
-            applyHighlightUI(cell, pi, d, "meal", person.mealHighlight[d]);
+            const status = person.mealStatus ? person.mealStatus[d] : "";
+            cell.appendChild(createMealInput(pi, d, "meal", person.meals[d], locked, status));
         }
 
         // Total display (rowSpan 2)
@@ -815,10 +860,9 @@ function renderTableBody() {
 
         for (let d=0; d<selectedMonthDays; d++) {
             const cell = guestRow.insertCell();
-            cell.classList.add("meal-cell");
             const locked = person.guestMealLocked[d] && !isManagerMode;
-            cell.appendChild(createMealInput(pi, d, "guest", person.guestMeals[d], locked));
-            applyHighlightUI(cell, pi, d, "guest", person.guestMealHighlight[d]);
+            const status = person.guestMealStatus ? person.guestMealStatus[d] : "";
+            cell.appendChild(createMealInput(pi, d, "guest", person.guestMeals[d], locked, status));
         }
     });
 

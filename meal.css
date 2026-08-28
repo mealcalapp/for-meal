@@ -364,44 +364,79 @@ input[type=number]::-webkit-inner-spin-button {
     margin: 0;
 }
 
-/* ── HIGHLIGHT DOTS & TINTED CELLS (manager mark) ─────────────── */
-.meal-cell { position: relative; }
-
-/* Soft tint — kept light so the meal number on top stays easy to read */
-.meal-cell.hl-yellow {
-    background: rgba(250, 204, 21, 0.26) !important;
-    box-shadow: inset 0 0 0 1px rgba(202, 138, 4, 0.35);
+/* ── DAY-STATUS PAINT (Meal Off / Ranna Hoyni) ──────────────────
+   Kept intentionally light/pastel — the number inside must stay
+   clearly readable, so this is a tint, not a solid fill. Two
+   classes on the input beat the single-class .locked-input /
+   .today-col rules (also !important) by specificity, so a painted
+   mark always shows through even on a locked or "today" cell. */
+.meal-input.cell-status-yellow {
+    background: #fef9c3 !important;
+    box-shadow: inset 0 0 0 1px rgba(217,119,6,0.4);
 }
-.meal-cell.hl-red {
-    background: rgba(239, 68, 68, 0.20) !important;
-    box-shadow: inset 0 0 0 1px rgba(190, 18, 60, 0.4);
+.meal-input.cell-status-red {
+    background: #fee2e2 !important;
+    box-shadow: inset 0 0 0 1px rgba(220,38,38,0.4);
+}
+.meal-input.cell-status-yellow:focus { background: #fef08a !important; }
+.meal-input.cell-status-red:focus    { background: #fecaca !important; }
+
+/* ── PAINT MODE ROW (Super Admin / Manager only) ────────────────── */
+.paint-mode-row td {
+    padding: 6px 10px;
+    white-space: normal;
+    border-color: #fde68a;
+}
+.paint-mode-row .paint-mode-ctrl {
+    background: linear-gradient(90deg, #fffbeb, #fef2f2);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+.paint-mode-hint {
+    background: linear-gradient(90deg, #fffbeb, #fef2f2);
+    color: var(--text-secondary);
+    font-size: 0.72rem;
+    font-weight: 500;
+    font-family: 'DM Sans', sans-serif;
+    text-transform: none;
+    letter-spacing: normal;
 }
 
-.hl-dots {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-}
-
-.hl-dot {
-    position: absolute;
-    bottom: 2px;
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
+.paint-mode-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 10px;
+    border-radius: 8px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    font-family: 'DM Sans', sans-serif;
+    text-transform: none;
+    letter-spacing: normal;
     cursor: pointer;
-    pointer-events: auto;
-    z-index: 3;
-    box-shadow: 0 0 0 1px rgba(255,255,255,0.75);
-    transition: transform 0.12s ease, box-shadow 0.12s ease;
+    border: 1.5px solid transparent;
+    background: #fff;
+    transition: all 0.15s;
 }
-.hl-dot:hover { transform: scale(1.5); }
+.paint-mode-btn:disabled { cursor: not-allowed; opacity: 0.5; }
 
-.hl-dot-yellow { left: 2px; background: #eab308; }
-.hl-dot-red    { right: 2px; background: #ef4444; }
+.paint-mode-btn.paint-yellow { color: #92400e; border-color: #fbbf24; }
+.paint-mode-btn.paint-yellow i { color: #facc15; }
+.paint-mode-btn.paint-yellow:hover:not(:disabled) { background: #fef9c3; }
+.paint-mode-btn.paint-yellow.active { background: #f59e0b; color: #fff; border-color: #b45309; }
+.paint-mode-btn.paint-yellow.active i { color: #fff; }
 
-.hl-dot.active {
-    box-shadow: 0 0 0 1.5px #fff, 0 0 0 3px rgba(15, 23, 42, 0.55);
+.paint-mode-btn.paint-red { color: #991b1b; border-color: #f87171; }
+.paint-mode-btn.paint-red i { color: #ef4444; }
+.paint-mode-btn.paint-red:hover:not(:disabled) { background: #fee2e2; }
+.paint-mode-btn.paint-red.active { background: #dc2626; color: #fff; border-color: #991b1b; }
+.paint-mode-btn.paint-red.active i { color: #fff; }
+
+@media (max-width: 768px) {
+    .paint-mode-btn { font-size: 0.66rem; padding: 4px 8px; }
+    .paint-mode-hint { font-size: 0.62rem; }
 }
 
 /* ── NOTES, BAZAR & DEPOSIT PANELS ──────────────────────────── */
