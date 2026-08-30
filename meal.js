@@ -693,6 +693,9 @@ function createMealInput(personIndex, dayIndex, type, value, locked) {
     input.disabled = !isManagerMode || locked || isReadOnlyForUser();
     if (input.disabled) input.classList.add("locked-input");
     input.addEventListener("input", handleMealInputChange);
+    input.addEventListener("wheel", (e) => {
+        e.preventDefault(); 
+    });
     return input;
 }
 
