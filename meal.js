@@ -681,8 +681,8 @@ function renderTableHeader() {
 function createMealInput(personIndex, dayIndex, type, value, locked) {
     const input = document.createElement("input");
     input.type = "number";
-    input.min  = "0";
-    input.step = "0.5";
+    input.min  = "1";
+    input.max  = "4";
     const isToday = isCurrentMonthView() && (dayIndex+1)===getTodayDay();
     input.className = `meal-input ${type==="meal"?"text-gray-800":"text-pink-700"}${isToday?" today-col":""}`;
     input.dataset.person = String(personIndex);
