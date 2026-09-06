@@ -93,6 +93,7 @@ let selectedMonthDate  = monthStart(new Date());
 let selectedMonthDays  = getDaysInMonth(selectedMonthDate);
 let currentUser        = null;   // firebase.auth().currentUser
 let storedManagerEmail = "";     // from Firebase for the selected month
+let cleanupAttempted = false;
 
 // ── Date helpers ──────────────────────────────────────────────
 function monthStart(date) { return new Date(date.getFullYear(), date.getMonth(), 1); }
@@ -1300,8 +1301,19 @@ async function openMonth(date) {
         } else {
             applyMonthData(snap.val()||{});
             computeManagerMode();
+                } else {
+            applyMonthData(snap.val()||{});
+            computeManagerMode();
             renderBazarCost(); renderNotes(); renderDeposits();
             updateManagerUI();
+
+            if (!cleanupAttempted) {
+                cleanupAttempted = true;
+                if (isManagerMode) {
+                    cleanupOldMonths().catch(err => console.error("cleanupOldMonths failed", err));
+                }
+            }
+        }
         }
         hideSkeleton();
     };
@@ -1731,7 +1743,7 @@ async function boot() {
 
         await loadMonthOptions();
         await openMonth(selectedMonthDate);
-        if (isManagerMode) await cleanupOldMonths();
+       
         updateManagerUI();
         hideSkeleton();
 
