@@ -1320,6 +1320,7 @@ activeRef.on("value", handleSnap, err => {
     hideSkeleton();
 });
 unsubscribeMonth = ()=>activeRef.off("value", handleSnap);
+}
     
 // ── Event handlers ────────────────────────────────────────────
 // Fires on every keystroke (not just on blur), so a name change is saved
