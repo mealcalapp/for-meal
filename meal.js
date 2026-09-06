@@ -56,10 +56,10 @@ const depositToggleBtn    = document.getElementById("deposit-toggle-btn");
 const depositPanel        = document.getElementById("deposit-panel");
 const depositList         = document.getElementById("deposit-list");
 const depositTotal        = document.getElementById("deposit-total");
-const bazarDateToggleBtn  = document.getElementById("bazardate-toggle-btn");
-const bazarDatePanel      = document.getElementById("bazardate-panel");
-const bazarDateRowsContainer = document.getElementById("bazardate-rows");
-const bazarDateAddRowBtn  = document.getElementById("bazardate-add-row-btn");
+const bazarDateToggleBtn  = document.getElementById("bazar-date-toggle-btn");
+const bazarDatePanel      = document.getElementById("bazar-date-panel");
+const bazarDateRowsContainer = document.getElementById("bazar-date-rows");
+const bazarDateAddRowBtn  = document.getElementById("bazar-date-add-row-btn");
 const googleSigninBtn     = document.getElementById("google-signin-btn");
 const managerLogoutBtn    = document.getElementById("manager-logout-btn");
 const changeManagerBtn    = document.getElementById("change-manager-btn");
@@ -80,15 +80,14 @@ let isManagerMode      = false;
 let isBazarVisible     = false;
 let isNoteVisible      = false;
 let isDepositVisible   = false;
-let isBazarDateVisible = false;
 let bazarCostText      = "";
 let monthNote          = "";
 let bazarRows          = [];   // parsed rows for the Bazar Cost notepad editor
 let noteRows           = [];   // parsed rows for the Additional Cost notepad editor
 let costRowSeq         = 0;
 let depositData        = [];
-let bazarDates         = [];   // [{id, date:"YYYY-MM-DD", names}] — Bazarer Date entries
-let bazarDateRowSeq    = 0;
+let isBazarDateVisible = false;
+let bazarDateEntries   = [];   // { id, day (1..daysInMonth or null), name }
 let selectedMonthDate  = monthStart(new Date());
 let selectedMonthDays  = getDaysInMonth(selectedMonthDate);
 let currentUser        = null;   // firebase.auth().currentUser
@@ -106,68 +105,6 @@ function getDaysInMonth(date) { return new Date(date.getFullYear(),date.getMonth
 function isCurrentMonthView() { return getMonthKey(selectedMonthDate)===getMonthKey(monthStart(new Date())); }
 function isReadOnlyForUser() { return !isSuperAdmin() && !isCurrentMonthView(); }
 function getTodayDay() { return new Date().getDate(); }
-
-// ── Bazarer Date helpers ────────────────────────────────────────
-function todayISO() {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
-}
-// Parsed with explicit Y/M/D (not `new Date(str)`) so the date is always
-// local midnight — a plain ISO-string parse can land on UTC midnight,
-// which silently shifts a day backwards for anyone east of UTC.
-function parseISODateLocal(str) {
-    if (typeof str !== "string") return null;
-    const m = str.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    if (!m) return null;
-    const d = new Date(Number(m[1]), Number(m[2])-1, Number(m[3]));
-    return isNaN(d.getTime()) ? null : d;
-}
-function formatBazarDateDisplay(str) {
-    const d = parseISODateLocal(str);
-    if (!d) return "Pick a date";
-    const dd = String(d.getDate()).padStart(2,"0");
-    const mm = String(d.getMonth()+1).padStart(2,"0");
-    const yy = String(d.getFullYear()).slice(-2);
-    const weekday = d.toLocaleDateString("en-US", { weekday: "long" });
-    return `${dd}-${mm}-${yy} ${weekday}`;
-}
-// No date entered yet (brand-new row) is never treated as "past" — it's
-// only locked once a real date has actually elapsed.
-function isBazarDatePast(str) {
-    const d = parseISODateLocal(str);
-    if (!d) return false;
-    return d.getTime() < parseISODateLocal(todayISO()).getTime();
-}
-// Managers/Super Admin can always edit. Everyone else can add/edit a row
-// as long as its date is today or in the future; once that date has
-// passed, the row locks for normal members (still open to the manager)
-// so history can't be quietly rewritten. Whole-month history view keeps
-// its existing read-only rule for non-super-admins.
-function canEditBazarDateRow(row) {
-    if (isManagerMode) return true;
-    if (isReadOnlyForUser()) return false;
-    return !isBazarDatePast(row.date);
-}
-function canAddBazarDate() { return isManagerMode || !isReadOnlyForUser(); }
-
-// The date field is now "type just the day, month/year auto-fill" (e.g.
-// type "06", shown as "06 /09/26") instead of a native date picker —
-// month/year always come from whichever month is currently open.
-function getBazarDateSuffix() {
-    const mm = String(selectedMonthDate.getMonth()+1).padStart(2,"0");
-    const yy = String(selectedMonthDate.getFullYear()).slice(-2);
-    return `/${mm}/${yy}`;
-}
-function getBazarDateDayPart(dateStr) {
-    const d = parseISODateLocal(dateStr);
-    return d ? String(d.getDate()).padStart(2,"0") : "";
-}
-function buildBazarDateFromDay(dayNum) {
-    if (!Number.isInteger(dayNum) || dayNum < 1 || dayNum > selectedMonthDays) return "";
-    const y = selectedMonthDate.getFullYear();
-    const m = selectedMonthDate.getMonth();
-    return `${y}-${String(m+1).padStart(2,"0")}-${String(dayNum).padStart(2,"0")}`;
-}
 
 // ── Number helpers ────────────────────────────────────────────
 function parseInput(v) { const n=parseFloat(v); return Number.isFinite(n)&&n>=0?n:0; }
@@ -244,22 +181,48 @@ function normalizeDeposits(deposits, count) {
     return Array.from({length:count},(_,i)=>parseInput(src[i]));
 }
 
-function nextBazarDateRowId() { return `bd${++bazarDateRowSeq}`; }
+// ── Bazarer Date (who did bazar on which day) ──────────────────
+// Anyone can log today's/a future date + name. Once a date is in the
+// past, only the manager or super admin may edit that entry — this is
+// enforced here client-side; real enforcement against a determined user
+// still needs matching Firebase Realtime Database Security Rules that
+// allow public writes to `bazarDates` but reject changes to entries
+// whose `day` is before today (mirrors the SUPER_ADMIN_EMAIL note above).
+function normalizeBazarDateEntry(raw) {
+    if (!raw || typeof raw !== "object") return null;
+    const dayNum = Number(raw.day);
+    const day = Number.isInteger(dayNum) && dayNum >= 1 && dayNum <= MAX_DAYS ? dayNum : null;
+    const name = typeof raw.name === "string" ? raw.name.trim() : "";
+    if (day === null && !name) return null;
+    return { day, name };
+}
 
-// Firebase can hand back an array or (if entries were removed leaving
-// gaps) an object keyed by index — accept either. Missing/blank ids get
-// a fresh local id so rows always have something unique to key off of.
 function normalizeBazarDates(raw) {
-    const src = Array.isArray(raw)
-        ? raw
-        : (raw && typeof raw==="object" ? Object.values(raw) : []);
-    return src
-        .filter(r => r && typeof r==="object")
-        .map(r => ({
-            id: typeof r.id==="string" && r.id ? r.id : nextBazarDateRowId(),
-            date: typeof r.date==="string" ? r.date : "",
-            names: typeof r.names==="string" ? r.names : ""
-        }));
+    const src = Array.isArray(raw) ? raw : (raw && typeof raw === "object" ? Object.values(raw) : []);
+    return src.map(normalizeBazarDateEntry).filter(Boolean).map(e => ({ id: nextRowId(), ...e }));
+}
+
+function serializeBazarDates(rows) {
+    return rows
+        .filter(r => r.day !== null || (r.name && r.name.trim() !== ""))
+        .map(r => ({ day: r.day, name: (r.name || "").trim() }));
+}
+
+function getMonthYearSuffix() {
+    const mm = String(selectedMonthDate.getMonth() + 1).padStart(2, "0");
+    const yy = String(selectedMonthDate.getFullYear()).slice(-2);
+    return `${mm}/${yy}`;
+}
+
+// Empty/new rows and today-or-future dates are open to everyone; a past
+// date can only be touched by the manager or super admin. History months
+// (viewing a previous month) stay fully locked for non-admins, same as
+// the rest of the app.
+function isBazarDateRowEditable(day) {
+    if (isManagerMode) return true; // covers super admin too (computeManagerMode)
+    if (isReadOnlyForUser()) return false;
+    if (day === null || day === undefined) return true;
+    return day >= getTodayDay();
 }
 
 // ── Firebase init ─────────────────────────────────────────────
@@ -350,8 +313,8 @@ function updateManagerUI() {
         managerNameInput.classList.toggle("manager-name-locked", !isManager);
     }
 
+    refreshBazarDateRowEditability();
     renderTable();
-    renderBazarDates();
 }
 
 // ── Header / notice ───────────────────────────────────────────
@@ -711,120 +674,105 @@ function updateDepositTotal() {
 }
 
 // ── Bazarer Date panel ──────────────────────────────────────────
-// A free-form, addable/removable list (not one column per calendar day)
-// since bazar trips aren't necessarily daily — could be every 2-3 days
-// or irregular. Each row is a date + who went. Anyone can add/edit a
-// row for today or a future date; once that date passes, only the
-// Manager/Super Admin can still touch that specific row (see
-// canEditBazarDateRow above) — editability is per-row, not per-month.
 function renderBazarDates() {
     if (!bazarDatePanel || !bazarDateRowsContainer) return;
     bazarDatePanel.classList.toggle("visible", isBazarDateVisible);
 
-    // Only skip the rebuild while someone is actively TYPING in a day or
-    // name field (so a Firebase echo of our own save doesn't yank the
-    // cursor mid-keystroke). A focused delete button must NOT trigger
-    // this skip, or clicking delete would splice the row out of the
-    // array but never rebuild the DOM to reflect it — which is exactly
-    // what made the ✕ button look broken.
-    const active = document.activeElement;
-    if (active && bazarDateRowsContainer.contains(active) &&
-        (active.classList.contains("bazardate-day-input") || active.classList.contains("bazardate-name-input"))) {
-        return;
+    // Same fix as the cost-row editors: don't tear down the DOM while
+    // someone is actively typing in it (an echo of our own debounced
+    // save re-firing the Firebase listener).
+    if (bazarDateRowsContainer.contains(document.activeElement)) return;
+
+    if (bazarDateEntries.length === 0) {
+        bazarDateEntries.push({ id: nextRowId(), day: null, name: "" });
     }
 
-    if (bazarDates.length === 0) bazarDates.push({ id: nextBazarDateRowId(), date: "", names: "" });
-
-    // Render in date order (blank/undated rows last) without reordering
-    // the underlying array, since Firebase array indices don't need to
-    // match display order here.
-    const ordered = [...bazarDates].sort((a,b) => {
-        if (!a.date && !b.date) return 0;
-        if (!a.date) return 1;
-        if (!b.date) return -1;
-        return a.date < b.date ? -1 : a.date > b.date ? 1 : 0;
+    const suffix = "/" + getMonthYearSuffix();
+    const sorted = [...bazarDateEntries].sort((a, b) => {
+        if (a.day === b.day) return 0;
+        if (a.day === null) return 1;
+        if (b.day === null) return -1;
+        return a.day - b.day;
     });
 
-    const suffix = getBazarDateSuffix();
-
     bazarDateRowsContainer.innerHTML = "";
-    ordered.forEach(row => {
-        const editable = canEditBazarDateRow(row);
+    sorted.forEach(row => {
+        const editable = isBazarDateRowEditable(row.day);
 
         const rowEl = document.createElement("div");
-        rowEl.className = "bazardate-row" + (editable ? "" : " bazardate-row-locked");
+        rowEl.className = "bazar-date-row" + (editable ? "" : " bazar-date-row-locked");
         rowEl.dataset.rowId = row.id;
 
-        const dateBlock = document.createElement("div");
-        dateBlock.className = "bazardate-date-block";
-
         const dateWrap = document.createElement("div");
-        dateWrap.className = "bazardate-date-input-wrap";
-
+        dateWrap.className = "bazar-date-input-wrap";
         const dayInput = document.createElement("input");
         dayInput.type = "text";
         dayInput.inputMode = "numeric";
-        dayInput.pattern = "[0-9]*";
+        dayInput.autocomplete = "off";
         dayInput.maxLength = 2;
-        dayInput.className = "bazardate-day-input";
-        dayInput.placeholder = "DD";
-        dayInput.value = getBazarDateDayPart(row.date);
+        dayInput.className = "bazar-date-day-input";
+        dayInput.placeholder = "00";
+        dayInput.value = row.day ? String(row.day).padStart(2, "0") : "";
         dayInput.disabled = !editable;
-
-        const suffixSpan = document.createElement("span");
-        suffixSpan.className = "bazardate-date-suffix";
-        suffixSpan.textContent = suffix;
-
-        dateWrap.append(dayInput, suffixSpan);
-
-        const dayLabel = document.createElement("div");
-        dayLabel.className = "bazardate-day-label";
-        dayLabel.textContent = row.date ? formatBazarDateDisplay(row.date) : "Pick a day";
-
-        dateBlock.append(dateWrap, dayLabel);
+        const suffixEl = document.createElement("span");
+        suffixEl.className = "bazar-date-suffix";
+        suffixEl.textContent = suffix;
+        dateWrap.append(dayInput, suffixEl);
 
         const nameInput = document.createElement("input");
         nameInput.type = "text";
-        nameInput.className = "bazardate-name-input";
+        nameInput.className = "bazar-date-name-input";
         nameInput.placeholder = "Bazar Karir Nam";
-        nameInput.value = row.names || "";
+        nameInput.value = row.name || "";
         nameInput.disabled = !editable;
 
-        const trailing = document.createElement("div");
-        trailing.className = "bazardate-row-trailing";
+        let trailEl;
         if (editable) {
-            const delBtn = document.createElement("button");
-            delBtn.type = "button";
-            delBtn.className = "bazardate-row-delete";
-            delBtn.title = "Remove row";
-            delBtn.innerHTML = '<i class="fas fa-times"></i>';
-            trailing.appendChild(delBtn);
+            trailEl = document.createElement("button");
+            trailEl.type = "button";
+            trailEl.className = "cost-row-delete bazar-date-row-delete";
+            trailEl.title = "Remove row";
+            trailEl.innerHTML = '<i class="fas fa-times"></i>';
         } else {
-            const lockIcon = document.createElement("span");
-            lockIcon.className = "bazardate-lock-icon";
-            lockIcon.title = "This date has passed — only Manager/Super Admin can edit it now";
-            lockIcon.innerHTML = '<i class="fas fa-lock"></i>';
-            trailing.appendChild(lockIcon);
+            trailEl = document.createElement("span");
+            trailEl.className = "bazar-date-lock-icon";
+            trailEl.title = "Only Manager/Super Admin can edit this entry";
+            trailEl.innerHTML = '<i class="fas fa-lock"></i>';
         }
 
-        rowEl.append(dateBlock, nameInput, trailing);
+        rowEl.append(dateWrap, nameInput, trailEl);
         bazarDateRowsContainer.appendChild(rowEl);
     });
 
-    if (bazarDateAddRowBtn) bazarDateAddRowBtn.disabled = !canAddBazarDate();
+    if (bazarDateAddRowBtn) bazarDateAddRowBtn.disabled = isReadOnlyForUser() && !isManagerMode;
 }
 
-// Writes ONLY the bazarDates array. Unlike saveFields(), this is
-// intentionally NOT gated behind isManagerMode — normal members are
-// meant to be able to log a bazar date/name themselves. Per-row edit
-// permission is enforced before this is ever called (see
-// canEditBazarDateRow / the handlers below); real enforcement against a
-// malicious client still belongs in Firebase Security Rules, same
-// caveat as the rest of this file.
-async function saveBazarDates(showFeedback=false) {
-    if (isReadOnlyForUser() && !isManagerMode) return; // whole-month history: blocked for non-admins
+// Lightweight refresh used from updateManagerUI(): flips disabled state /
+// lock styling on existing rows without rebuilding the DOM, so it never
+// interrupts someone mid-keystroke (mirrors how cost-row editability is
+// patched in place there too).
+function refreshBazarDateRowEditability() {
+    if (!bazarDateRowsContainer) return;
+    bazarDateRowsContainer.querySelectorAll(".bazar-date-row").forEach(rowEl => {
+        const row = bazarDateEntries.find(r => r.id === rowEl.dataset.rowId);
+        if (!row) return;
+        const editable = isBazarDateRowEditable(row.day);
+        rowEl.classList.toggle("bazar-date-row-locked", !editable);
+        const dayInput  = rowEl.querySelector(".bazar-date-day-input");
+        const nameInput = rowEl.querySelector(".bazar-date-name-input");
+        if (dayInput)  dayInput.disabled  = !editable;
+        if (nameInput) nameInput.disabled = !editable;
+        // Delete vs lock icon swap only happens on a full render; that's
+        // fine here since it's a rare mode-change event, not a keystroke.
+    });
+    if (bazarDateAddRowBtn) bazarDateAddRowBtn.disabled = isReadOnlyForUser() && !isManagerMode;
+}
+
+function findBazarDateRow(rowId) { return bazarDateEntries.find(r => r.id === rowId); }
+
+async function saveBazarDateEntries(showFeedback = false) {
     const monthKey = getMonthKey(selectedMonthDate);
-    const payload = { bazarDates, updatedAt: Date.now() };
+    const payload = { bazarDates: serializeBazarDates(bazarDateEntries), updatedAt: Date.now() };
     if (!db) {
         mergeLocalFields(monthKey, payload);
         if (showFeedback) showMessage("Saved!");
@@ -835,67 +783,85 @@ async function saveBazarDates(showFeedback=false) {
     if (showFeedback) showMessage("Saved!");
 }
 
-function findBazarDateRow(id) { return bazarDates.find(r => r.id === id); }
-
 function handleBazarDateInput(event) {
     const target = event.target;
-    const rowEl = target.closest(".bazardate-row");
+    const rowEl = target.closest(".bazar-date-row");
     if (!rowEl) return;
     const row = findBazarDateRow(rowEl.dataset.rowId);
-    if (!row || !canEditBazarDateRow(row)) return;
+    if (!row) return;
 
-    if (target.classList.contains("bazardate-day-input")) {
-        const digits = target.value.replace(/\D/g,"").slice(0,2);
-        if (digits !== target.value) target.value = digits;
-        const dayNum = digits === "" ? NaN : parseInt(digits,10);
-        row.date = buildBazarDateFromDay(dayNum);
-        const label = rowEl.querySelector(".bazardate-day-label");
-        if (label) label.textContent = row.date ? formatBazarDateDisplay(row.date) : "Pick a day";
-    } else if (target.classList.contains("bazardate-name-input")) {
-        row.names = target.value;
+    if (target.classList.contains("bazar-date-day-input")) {
+        const digits = target.value.replace(/\D/g, "").slice(0, 2);
+        if (target.value !== digits) target.value = digits;
+        const n = parseInt(digits, 10);
+        const newDay = Number.isInteger(n) && n >= 1 && n <= selectedMonthDays ? n : null;
+        if (newDay !== null && !isBazarDateRowEditable(newDay)) {
+            showMessage("Only Manager/Super Admin can set a past date", true);
+            target.value = row.day ? String(row.day).padStart(2, "0") : "";
+            return;
+        }
+        row.day = newDay;
+    } else if (target.classList.contains("bazar-date-name-input")) {
+        if (!isBazarDateRowEditable(row.day)) return;
+        row.name = target.value;
     } else {
         return;
     }
 
-    debounceKeyed("bazarDates", () => {
-        saveBazarDates().catch(err => { console.error(err); showMessage("Save failed", true); });
-    }, 400);
+    debounceKeyed("bazar-date-save", () => {
+        saveBazarDateEntries().catch(err => { console.error(err); showMessage("Save failed", true); });
+    }, 350);
 }
 
 function handleBazarDateBlur(event) {
     const target = event.target;
-    if (!target.classList || (!target.classList.contains("bazardate-day-input") && !target.classList.contains("bazardate-name-input"))) return;
-    const rowEl = target.closest(".bazardate-row");
-    const row = rowEl && findBazarDateRow(rowEl.dataset.rowId);
-    if (!row || !canEditBazarDateRow(row)) return;
-    saveBazarDates(true).catch(err => { console.error(err); showMessage("Save failed", true); });
+    if (!target.classList || (!target.classList.contains("bazar-date-day-input") && !target.classList.contains("bazar-date-name-input"))) return;
+    saveBazarDateEntries(true).catch(err => { console.error(err); showMessage("Save failed", true); });
 }
 
 function handleBazarDateClick(event) {
-    const delBtn = event.target.closest(".bazardate-row-delete");
+    const delBtn = event.target.closest(".bazar-date-row-delete");
     if (!delBtn) return;
-    const rowEl = delBtn.closest(".bazardate-row");
-    const row = rowEl && findBazarDateRow(rowEl.dataset.rowId);
-    if (!row || !canEditBazarDateRow(row)) return;
-    const idx = bazarDates.findIndex(r => r.id === row.id);
+    const rowEl = delBtn.closest(".bazar-date-row");
+    const row = findBazarDateRow(rowEl?.dataset.rowId);
+    if (!row) return;
+    if (!isBazarDateRowEditable(row.day)) return;
+    const idx = bazarDateEntries.findIndex(r => r.id === row.id);
     if (idx === -1) return;
-    bazarDates.splice(idx, 1);
-    if (bazarDates.length === 0) bazarDates.push({ id: nextBazarDateRowId(), date: "", names: "" });
-    // Move focus off the (about-to-be-removed) delete button first so the
-    // active-element check above never sees it as "still being edited".
-    if (document.activeElement === delBtn) delBtn.blur();
+    bazarDateEntries.splice(idx, 1);
+    if (bazarDateEntries.length === 0) bazarDateEntries.push({ id: nextRowId(), day: null, name: "" });
     renderBazarDates();
-    saveBazarDates(true).catch(err => { console.error(err); showMessage("Save failed", true); });
+    saveBazarDateEntries(true).catch(err => { console.error(err); showMessage("Save failed", true); });
 }
 
 function handleBazarDateAddRow() {
-    if (!canAddBazarDate()) return;
-    const defaultDay = isCurrentMonthView() ? getTodayDay() : null;
-    const row = { id: nextBazarDateRowId(), date: defaultDay ? buildBazarDateFromDay(defaultDay) : "", names: "" };
-    bazarDates.push(row);
+    if (isReadOnlyForUser() && !isManagerMode) return;
+    const row = { id: nextRowId(), day: null, name: "" };
+    bazarDateEntries.push(row);
     renderBazarDates();
-    const input = bazarDateRowsContainer?.querySelector(`.bazardate-row[data-row-id="${row.id}"] .bazardate-name-input`);
+    const input = bazarDateRowsContainer?.querySelector(`.bazar-date-row[data-row-id="${row.id}"] .bazar-date-day-input`);
     if (input) input.focus();
+}
+
+function handleBazarDateKeydown(event) {
+    if (event.key !== "Enter") return;
+    const target = event.target;
+    if (!target.classList.contains("bazar-date-day-input") && !target.classList.contains("bazar-date-name-input")) return;
+    event.preventDefault();
+    const rowEl = target.closest(".bazar-date-row");
+    const row = findBazarDateRow(rowEl?.dataset.rowId);
+    if (!row) return;
+
+    if (target.classList.contains("bazar-date-day-input")) {
+        rowEl.querySelector(".bazar-date-name-input")?.focus();
+        return;
+    }
+    const idx = bazarDateEntries.findIndex(r => r.id === row.id);
+    if (idx === bazarDateEntries.length - 1 && isBazarDateRowEditable(null)) {
+        handleBazarDateAddRow();
+    } else {
+        target.blur();
+    }
 }
 
 // ── Table rendering ───────────────────────────────────────────
@@ -1153,7 +1119,7 @@ function buildInitialFields() {
         bazarCost:     bazarCostText,
         note:          monthNote,
         deposits:      depositData,
-        bazarDates:    bazarDates,
+        bazarDates:    serializeBazarDates(bazarDateEntries),
         members:       mealData
     };
 }
@@ -1239,7 +1205,7 @@ function applyMonthData(data) {
     monthNote        = typeof data?.note==="string" ? data.note : "";
     mealData         = normalizeMembers(data?.members, count);
     depositData      = normalizeDeposits(data?.deposits, count);
-    bazarDates       = normalizeBazarDates(data?.bazarDates);
+    bazarDateEntries = normalizeBazarDates(data?.bazarDates);
     storedManagerEmail = mgrEmail;
 
     membersInput.value        = String(numPeople);
@@ -1253,7 +1219,7 @@ function applyDefaultMonth() {
     bazarCostText    = "";
     monthNote        = "";
     depositData      = Array(numPeople).fill(0);
-    bazarDates       = [];
+    bazarDateEntries = [];
     storedManagerEmail = "";
     mealData         = Array.from({length:numPeople},(_,i)=>getDefaultMember(i));
     membersInput.value        = "20";
@@ -1272,13 +1238,13 @@ async function openMonth(date) {
         const data = readLocalStore()[monthKey];
         if (!data) {
             applyDefaultMonth();
-            renderBazarCost(); renderNotes(); renderDeposits();
+            renderBazarCost(); renderNotes(); renderDeposits(); renderBazarDates();
             updateManagerUI();
             await saveFields(buildInitialFields(), false);
         } else {
             applyMonthData(data);
             computeManagerMode();
-            renderBazarCost(); renderNotes(); renderDeposits();
+            renderBazarCost(); renderNotes(); renderDeposits(); renderBazarDates();
             updateManagerUI();
         }
         return;
@@ -1292,14 +1258,14 @@ async function openMonth(date) {
     const handleSnap = async (snap) => {
         if (!snap.exists()) {
             applyDefaultMonth();
-            renderBazarCost(); renderNotes(); renderDeposits();
+            renderBazarCost(); renderNotes(); renderDeposits(); renderBazarDates();
             updateManagerUI();
             // Only manager can init a new month document
             if (isManagerMode) await saveFields(buildInitialFields(), false);
         } else {
             applyMonthData(snap.val()||{});
             computeManagerMode();
-            renderBazarCost(); renderNotes(); renderDeposits();
+            renderBazarCost(); renderNotes(); renderDeposits(); renderBazarDates();
             updateManagerUI();
         }
         hideSkeleton();
@@ -1619,19 +1585,12 @@ function bindEvents() {
     document.getElementById("deposit-close-btn").addEventListener("click",()=>{
         isDepositVisible=false; renderDeposits();
     });
-    const bazarDateCloseBtn = document.getElementById("bazardate-close-btn");
+    const bazarDateCloseBtn = document.getElementById("bazar-date-close-btn");
     if (bazarDateCloseBtn) {
         bazarDateCloseBtn.addEventListener("click",()=>{
             isBazarDateVisible=false; renderBazarDates();
         });
     }
-
-    if (bazarDateRowsContainer) {
-        bazarDateRowsContainer.addEventListener("input",  handleBazarDateInput);
-        bazarDateRowsContainer.addEventListener("blur",   handleBazarDateBlur, true);
-        bazarDateRowsContainer.addEventListener("click",  handleBazarDateClick);
-    }
-    if (bazarDateAddRowBtn) bazarDateAddRowBtn.addEventListener("click", handleBazarDateAddRow);
 
     if (bazarRowsContainer) {
         bazarRowsContainer.addEventListener("input",   e => handleCostRowInput("bazar", e));
@@ -1648,6 +1607,14 @@ function bindEvents() {
         notesRowsContainer.addEventListener("keydown", e => handleCostRowKeydown("notes", e));
     }
     if (notesAddRowBtn) notesAddRowBtn.addEventListener("click", () => handleCostAddRow("notes"));
+
+    if (bazarDateRowsContainer) {
+        bazarDateRowsContainer.addEventListener("input",   handleBazarDateInput);
+        bazarDateRowsContainer.addEventListener("blur",    handleBazarDateBlur, true);
+        bazarDateRowsContainer.addEventListener("click",   handleBazarDateClick);
+        bazarDateRowsContainer.addEventListener("keydown", handleBazarDateKeydown);
+    }
+    if (bazarDateAddRowBtn) bazarDateAddRowBtn.addEventListener("click", handleBazarDateAddRow);
 
     // Re-wrap description rows on resize/rotation, since wrap width changes.
     window.addEventListener("resize", () => {
