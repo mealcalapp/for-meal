@@ -675,7 +675,8 @@ input[type=number]::-webkit-inner-spin-button {
 
 .bazardate-date-block {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
+    align-items: center;
     gap: 4px;
     min-width: 0;
 }
@@ -982,7 +983,7 @@ input[type=number]::-webkit-inner-spin-button {
         column-gap: 8px;
         padding: 10px 6px;
     }
-    .bazardate-date-block { grid-area: date; flex-direction: column; align-items: flex-start; gap: 4px; }
+    .bazardate-date-block { grid-area: date; flex-direction: row; align-items: flex-start; gap: 4px; }
     .bazardate-row-trailing { grid-area: trailing; justify-content: flex-end; }
     .bazardate-name-input { grid-area: name; font-size: 13.5px; }
     .bazardate-date-input-wrap { height: 32px; }
