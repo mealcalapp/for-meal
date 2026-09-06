@@ -1189,7 +1189,7 @@ async function saveFields(fields, showFeedback=false) {
 
 // ── Month loading ─────────────────────────────────────────────
 async function cleanupOldMonths() {
-    const threshold = getMonthKey(addMonths(monthStart(new Date()),-1));
+    const threshold = getMonthKey(addMonths(monthStart(new Date()),-2));
     if (!db) {
         const store = readLocalStore();
         Object.keys(store).filter(k=>k<threshold).forEach(k=>delete store[k]);
