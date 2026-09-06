@@ -144,11 +144,12 @@ function isBazarDatePast(str) {
 // so history can't be quietly rewritten. Whole-month history view keeps
 // its existing read-only rule for non-super-admins.
 function canEditBazarDateRow(row) {
-    if (isManagerMode) return true;
-    if (isReadOnlyForUser()) return false;
-    return !isBazarDatePast(row.date);
+    return isManagerMode;
 }
-function canAddBazarDate() { return isManagerMode || !isReadOnlyForUser(); }
+
+function canAddBazarDate() {
+    return isManagerMode;
+}
 
 // The date field is now "type just the day, month/year auto-fill" (e.g.
 // type "06", shown as "06 /09/26") instead of a native date picker —
