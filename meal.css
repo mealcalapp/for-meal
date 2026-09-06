@@ -167,13 +167,13 @@ body {
 
 .google-btn svg { width: 16px; height: 16px; flex-shrink: 0; }
 
-.note-toggle-btn, .bazar-toggle-btn, .deposit-toggle-btn {
+.note-toggle-btn, .bazar-toggle-btn, .deposit-toggle-btn, .bazardate-toggle-btn {
     background: rgba(255,255,255,0.14);
     border: 1px solid rgba(255,255,255,0.25);
     transition: background 0.2s;
 }
 
-.note-toggle-btn:hover, .bazar-toggle-btn:hover, .deposit-toggle-btn:hover {
+.note-toggle-btn:hover, .bazar-toggle-btn:hover, .deposit-toggle-btn:hover, .bazardate-toggle-btn:hover {
     background: rgba(255,255,255,0.24);
 }
 
@@ -364,8 +364,8 @@ input[type=number]::-webkit-inner-spin-button {
     margin: 0;
 }
 
-/* ── NOTES, BAZAR & DEPOSIT PANELS ──────────────────────────── */
-.notes-panel, .bazar-panel, .deposit-panel {
+/* ── NOTES, BAZAR, DEPOSIT & BAZAR DATE PANELS ──────────────── */
+.notes-panel, .bazar-panel, .deposit-panel, .bazardate-panel {
     display: none;
     margin-top: 20px;
     border-radius: 20px;
@@ -374,7 +374,7 @@ input[type=number]::-webkit-inner-spin-button {
     transition: max-height 0.3s ease;
 }
 
-.notes-panel.visible, .bazar-panel.visible, .deposit-panel.visible { display: block; }
+.notes-panel.visible, .bazar-panel.visible, .deposit-panel.visible, .bazardate-panel.visible { display: block; }
 
 .notes-panel {
     background: linear-gradient(180deg, rgba(255,248,196,0.95) 0%, rgba(255,245,168,0.95) 100%);
@@ -391,7 +391,12 @@ input[type=number]::-webkit-inner-spin-button {
     border: 1px solid rgba(37,99,235,0.14);
 }
 
-.notes-toolbar, .bazar-toolbar, .deposit-toolbar {
+.bazardate-panel {
+    background: linear-gradient(180deg, rgba(237,233,254,0.97) 0%, rgba(221,214,254,0.97) 100%);
+    border: 1px solid rgba(124,58,237,0.16);
+}
+
+.notes-toolbar, .bazar-toolbar, .deposit-toolbar, .bazardate-toolbar {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -402,13 +407,16 @@ input[type=number]::-webkit-inner-spin-button {
 .notes-toolbar { border-bottom: 1px solid rgba(217,119,6,0.15); }
 .bazar-toolbar { border-bottom: 1px solid rgba(22,163,74,0.12); }
 .deposit-toolbar { border-bottom: 1px solid rgba(37,99,235,0.14); }
+.bazardate-toolbar { border-bottom: 1px solid rgba(124,58,237,0.14); }
 
 .notes-title { font-size: 0.95rem; font-weight: 800; color: #854d0e; }
 .bazar-title { font-size: 0.95rem; font-weight: 800; color: #166534; }
 .deposit-title { font-size: 0.95rem; font-weight: 800; color: #1e40af; }
+.bazardate-title { font-size: 0.95rem; font-weight: 800; color: #5b21b6; }
 .notes-hint { font-size: 0.75rem; color: #a16207; }
 .bazar-hint { font-size: 0.75rem; color: #15803d; }
 .deposit-hint { font-size: 0.75rem; color: #2563eb; }
+.bazardate-hint { font-size: 0.75rem; color: #6d28d9; }
 
 /* ── Ruled notepad row editor (Bazar Cost / Additional Cost) ─── */
 .cost-editor {
@@ -637,6 +645,154 @@ input[type=number]::-webkit-inner-spin-button {
 .bazar-panel .panel-close-btn:hover { background: rgba(22,163,74,0.28); }
 .deposit-panel .panel-close-btn { background: rgba(37,99,235,0.15); color: #1e40af; }
 .deposit-panel .panel-close-btn:hover { background: rgba(37,99,235,0.28); }
+.bazardate-panel .panel-close-btn { background: rgba(124,58,237,0.15); color: #5b21b6; }
+.bazardate-panel .panel-close-btn:hover { background: rgba(124,58,237,0.28); }
+
+/* ── Bazarer Date list editor (date + who-went, per-row lock) ──
+   Not a fixed daily grid — bazar trips can happen every few days, so
+   this is a free-form, addable/removable list instead of one column
+   per calendar day. Any signed-in-or-not visitor can add/edit a row
+   for today or a future date; once a date is in the past, only the
+   Manager or Super Admin may still edit/remove that row (enforced in
+   canEditBazarDateRow() in meal.js — client-side only, same caveat as
+   the rest of this file re: real enforcement belonging in Firebase
+   Security Rules). */
+.bazardate-editor { padding: 8px 16px 18px; }
+
+.bazardate-rows { display: flex; flex-direction: column; }
+
+.bazardate-row {
+    display: grid;
+    grid-template-columns: 128px 1fr 32px;
+    align-items: center;
+    column-gap: 12px;
+    min-height: 54px;
+    padding: 10px 4px;
+    border-bottom: 1px solid rgba(124,58,237,0.14);
+}
+.bazardate-rows .bazardate-row:last-child { border-bottom: none; }
+.bazardate-row.bazardate-row-locked { opacity: 0.75; }
+
+.bazardate-date-block {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+/* "Type just the day" input — month/year are read-only and always
+   follow whichever month is currently open, so the visible field reads
+   like [06] /09/26 instead of a native date picker. */
+.bazardate-date-input-wrap {
+    display: flex;
+    align-items: center;
+    height: 34px;
+    border: 1px solid rgba(124,58,237,0.28);
+    border-radius: 8px;
+    padding: 0 8px;
+    background: rgba(255,255,255,0.72);
+}
+.bazardate-date-input-wrap:focus-within {
+    border-color: rgba(124,58,237,0.65);
+    box-shadow: 0 0 0 2px rgba(124,58,237,0.18);
+}
+
+.bazardate-day-input {
+    width: 24px;
+    flex-shrink: 0;
+    border: none;
+    outline: none;
+    background: transparent;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.86rem;
+    font-weight: 700;
+    color: #4c1d95;
+    text-align: center;
+    padding: 0;
+}
+.bazardate-day-input::placeholder { color: #a78bfa; opacity: 0.85; }
+.bazardate-day-input:disabled {
+    opacity: 1;
+    color: #6d28d9;
+    -webkit-text-fill-color: #6d28d9;
+    cursor: not-allowed;
+}
+
+.bazardate-date-suffix {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #7c3aed;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.bazardate-day-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #7c3aed;
+    padding-left: 2px;
+    white-space: normal;
+    line-height: 1.3;
+}
+
+.bazardate-name-input {
+    width: 100%;
+    min-width: 0;
+    height: 34px;
+    border: 1px solid rgba(124,58,237,0.2);
+    border-radius: 8px;
+    background: rgba(255,255,255,0.55);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14.5px;
+    color: #3b0764;
+    padding: 0 10px;
+    align-self: center;
+}
+.bazardate-name-input::placeholder { color: #a78bfa; opacity: 0.9; }
+.bazardate-name-input:focus { outline: none; border-color: rgba(124,58,237,0.6); box-shadow: 0 0 0 2px rgba(124,58,237,0.18); background: rgba(255,255,255,0.85); }
+.bazardate-name-input:disabled { opacity: 1; -webkit-text-fill-color: #3b0764; cursor: not-allowed; background: rgba(255,255,255,0.3); }
+
+.bazardate-row-trailing { display: flex; align-items: center; justify-content: center; }
+
+.bazardate-row-delete {
+    width: 26px; height: 26px;
+    border: none;
+    border-radius: 9999px;
+    background: transparent;
+    color: #6d28d9;
+    opacity: 0.55;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.bazardate-row-delete:hover { opacity: 1; background: rgba(124,58,237,0.14); }
+
+.bazardate-lock-icon {
+    width: 26px; height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9999px;
+    background: rgba(124,58,237,0.1);
+    color: #7c3aed;
+    font-size: 11px;
+}
+
+.bazardate-add-row { padding: 10px 4px 2px; }
+.bazardate-add-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: none;
+    background: transparent;
+    font-size: 0.82rem;
+    font-weight: 700;
+    cursor: pointer;
+    padding: 6px 4px;
+    color: #6d28d9;
+}
+.bazardate-add-btn:disabled { display: none; }
 
 /* ── FAB ────────────────────────────────────────────────────── */
 #floatingButton {
@@ -799,8 +955,8 @@ input[type=number]::-webkit-inner-spin-button {
     .grand-total-row td { padding: 8px; font-size: 0.72rem; }
 
     /* Panels */
-    .notes-panel, .bazar-panel, .deposit-panel { border-radius: 12px; margin-top: 12px; }
-    .notes-toolbar, .bazar-toolbar, .deposit-toolbar { padding: 10px 14px; }
+    .notes-panel, .bazar-panel, .deposit-panel, .bazardate-panel { border-radius: 12px; margin-top: 12px; }
+    .notes-toolbar, .bazar-toolbar, .deposit-toolbar, .bazardate-toolbar { padding: 10px 14px; }
     .cost-editor { padding: 6px 10px 14px; }
     .cost-row { grid-template-columns: 1fr 92px 24px; column-gap: 6px; min-height: 42px; }
     .cost-desc-input { font-size: 13.5px; }
@@ -815,6 +971,24 @@ input[type=number]::-webkit-inner-spin-button {
     }
     .deposit-name { font-size: 0.78rem; }
     .deposit-input { height: 32px; font-size: 0.78rem; padding: 0 8px; }
+
+    /* Bazarer Date — stack date block above the names field so long
+       "Mamun Bhai + Asaduzzam Bhai" style entries never get squeezed */
+    .bazardate-editor { padding: 6px 10px 14px; }
+    .bazardate-row {
+        grid-template-columns: 1fr 28px;
+        grid-template-areas: "date trailing" "name name";
+        row-gap: 8px;
+        column-gap: 8px;
+        padding: 10px 6px;
+    }
+    .bazardate-date-block { grid-area: date; flex-direction: column; align-items: flex-start; gap: 4px; }
+    .bazardate-row-trailing { grid-area: trailing; justify-content: flex-end; }
+    .bazardate-name-input { grid-area: name; font-size: 13.5px; }
+    .bazardate-date-input-wrap { height: 32px; }
+    .bazardate-day-input { font-size: 0.82rem; }
+    .bazardate-date-suffix { font-size: 0.76rem; }
+    .bazardate-day-label { font-size: 0.68rem; }
 
     /* FAB — icon only */
     #floatingButton { bottom: 16px; right: 12px; padding: 12px 14px; }

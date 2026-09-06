@@ -128,6 +128,9 @@
             <button id="deposit-toggle-btn" class="deposit-toggle-btn px-3 py-1.5 text-sm font-semibold text-white rounded-lg">
                 <i class="fas fa-money-bill-wave mr-1"></i>Deposit Tk
             </button>
+            <button id="bazardate-toggle-btn" class="bazardate-toggle-btn px-3 py-1.5 text-sm font-semibold text-white rounded-lg">
+                <i class="fas fa-calendar-days mr-1"></i>Bazarer Date
+            </button>
 
             <!-- Google Sign-in button -->
             <button id="google-signin-btn" class="google-btn">
@@ -176,7 +179,7 @@
     <div class="cost-editor" id="bazar-cost-editor">
         <div class="cost-rows" id="bazar-rows"></div>
         <div class="cost-add-row">
-            <button type="button" class="cost-add-btn" id="bazar-add-row-btn"><i class="fas fa-plus"></i> Add item</button>
+            <button type="button" class="cost-add-btn" id="bazar-add-row-btn"><i class="fas fa-plus"></i> Add name</button>
         </div>
         <div class="cost-total-row">
             <span>Total Bazar Cost</span>
@@ -197,7 +200,7 @@
     <div class="cost-editor" id="notes-cost-editor">
         <div class="cost-rows" id="notes-rows"></div>
         <div class="cost-add-row">
-            <button type="button" class="cost-add-btn" id="notes-add-row-btn"><i class="fas fa-plus"></i> Add item</button>
+            <button type="button" class="cost-add-btn" id="notes-add-row-btn"><i class="fas fa-plus"></i> Add another</button>
         </div>
         <div class="cost-total-row">
             <span>Total Add. Cost</span>
@@ -220,6 +223,23 @@
         <div class="deposit-total-row">
             <span>Total Deposit</span>
             <strong id="deposit-total">0 Tk</strong>
+        </div>
+    </div>
+</section>
+
+<!-- BAZAR DATE PANEL -->
+<section id="bazardate-panel" class="bazardate-panel">
+    <div class="bazardate-toolbar">
+        <div>
+            <div class="bazardate-title"><i class="fas fa-calendar-days mr-2"></i>Bazarer Date</div>
+            <div class="bazardate-hint">Everyone can edit</div>
+        </div>
+        <button class="panel-close-btn" id="bazardate-close-btn" title="Close">✕</button>
+    </div>
+    <div class="bazardate-editor" id="bazardate-editor">
+        <div class="bazardate-rows" id="bazardate-rows"></div>
+        <div class="bazardate-add-row">
+            <button type="button" class="bazardate-add-btn" id="bazardate-add-row-btn"><i class="fas fa-plus"></i> Add date</button>
         </div>
     </div>
 </section>
