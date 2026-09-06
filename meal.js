@@ -426,7 +426,7 @@ function renderCostRows(kind) {
         const descInput = document.createElement("textarea");
         descInput.rows = 1;
         descInput.className = "cost-desc-input";
-        descInput.placeholder = "Item / description";
+        descInput.placeholder = "Name";
         descInput.value = row.desc || "";
         descInput.disabled = !editable;
 
