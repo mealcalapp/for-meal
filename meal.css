@@ -167,13 +167,13 @@ body {
 
 .google-btn svg { width: 16px; height: 16px; flex-shrink: 0; }
 
-.note-toggle-btn, .bazar-toggle-btn, .deposit-toggle-btn, .bazar-date-toggle-btn {
+.note-toggle-btn, .bazar-toggle-btn, .deposit-toggle-btn {
     background: rgba(255,255,255,0.14);
     border: 1px solid rgba(255,255,255,0.25);
     transition: background 0.2s;
 }
 
-.note-toggle-btn:hover, .bazar-toggle-btn:hover, .deposit-toggle-btn:hover, .bazar-date-toggle-btn:hover {
+.note-toggle-btn:hover, .bazar-toggle-btn:hover, .deposit-toggle-btn:hover {
     background: rgba(255,255,255,0.24);
 }
 
@@ -365,7 +365,7 @@ input[type=number]::-webkit-inner-spin-button {
 }
 
 /* ── NOTES, BAZAR & DEPOSIT PANELS ──────────────────────────── */
-.notes-panel, .bazar-panel, .deposit-panel, .bazar-date-panel {
+.notes-panel, .bazar-panel, .deposit-panel {
     display: none;
     margin-top: 20px;
     border-radius: 20px;
@@ -374,7 +374,7 @@ input[type=number]::-webkit-inner-spin-button {
     transition: max-height 0.3s ease;
 }
 
-.notes-panel.visible, .bazar-panel.visible, .deposit-panel.visible, .bazar-date-panel.visible { display: block; }
+.notes-panel.visible, .bazar-panel.visible, .deposit-panel.visible { display: block; }
 
 .notes-panel {
     background: linear-gradient(180deg, rgba(255,248,196,0.95) 0%, rgba(255,245,168,0.95) 100%);
@@ -391,12 +391,7 @@ input[type=number]::-webkit-inner-spin-button {
     border: 1px solid rgba(37,99,235,0.14);
 }
 
-.bazar-date-panel {
-    background: linear-gradient(180deg, rgba(237,233,254,0.97) 0%, rgba(221,214,254,0.97) 100%);
-    border: 1px solid rgba(124,58,237,0.16);
-}
-
-.notes-toolbar, .bazar-toolbar, .deposit-toolbar, .bazar-date-toolbar {
+.notes-toolbar, .bazar-toolbar, .deposit-toolbar {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -407,16 +402,13 @@ input[type=number]::-webkit-inner-spin-button {
 .notes-toolbar { border-bottom: 1px solid rgba(217,119,6,0.15); }
 .bazar-toolbar { border-bottom: 1px solid rgba(22,163,74,0.12); }
 .deposit-toolbar { border-bottom: 1px solid rgba(37,99,235,0.14); }
-.bazar-date-toolbar { border-bottom: 1px solid rgba(124,58,237,0.16); }
 
 .notes-title { font-size: 0.95rem; font-weight: 800; color: #854d0e; }
 .bazar-title { font-size: 0.95rem; font-weight: 800; color: #166534; }
 .deposit-title { font-size: 0.95rem; font-weight: 800; color: #1e40af; }
-.bazar-date-title { font-size: 0.95rem; font-weight: 800; color: #5b21b6; }
 .notes-hint { font-size: 0.75rem; color: #a16207; }
 .bazar-hint { font-size: 0.75rem; color: #15803d; }
 .deposit-hint { font-size: 0.75rem; color: #2563eb; }
-.bazar-date-hint { font-size: 0.75rem; color: #6d28d9; }
 
 /* ── Ruled notepad row editor (Bazar Cost / Additional Cost) ─── */
 .cost-editor {
@@ -536,7 +528,6 @@ input[type=number]::-webkit-inner-spin-button {
 }
 .bazar-panel .cost-add-btn { color: #166534; }
 .notes-panel .cost-add-btn { color: #92400e; }
-.bazar-date-panel .cost-add-btn { color: #5b21b6; }
 .cost-add-btn:disabled { display: none; }
 
 .cost-total-row {
@@ -628,93 +619,6 @@ input[type=number]::-webkit-inner-spin-button {
     font-weight: 800;
 }
 
-/* ── BAZARER DATE ROWS ───────────────────────────────────────── */
-.bazar-date-editor { padding: 8px 16px 18px; }
-
-.bazar-date-row {
-    display: grid;
-    grid-template-columns: 108px 1fr 28px;
-    align-items: center;
-    column-gap: 10px;
-    min-height: 44px;
-    padding: 10px 2px;
-    border-bottom: 1px solid rgba(124,58,237,0.16);
-}
-.bazar-date-rows .bazar-date-row:last-child { border-bottom: none; }
-
-.bazar-date-input-wrap {
-    display: flex;
-    align-items: center;
-    height: 34px;
-    border-radius: 8px;
-    background: rgba(255,255,255,0.68);
-    border: 1px solid rgba(124,58,237,0.24);
-    padding: 0 8px;
-    font-family: 'DM Mono', monospace;
-}
-
-.bazar-date-day-input {
-    width: 24px;
-    min-width: 0;
-    border: none;
-    background: transparent;
-    text-align: center;
-    font-family: 'DM Mono', monospace;
-    font-size: 0.86rem;
-    font-weight: 700;
-    color: #5b21b6;
-    -moz-appearance: textfield;
-}
-.bazar-date-day-input::-webkit-outer-spin-button,
-.bazar-date-day-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-.bazar-date-day-input::placeholder { color: #a78bfa; opacity: 0.8; }
-.bazar-date-day-input:focus { outline: none; }
-.bazar-date-day-input:disabled { opacity: 1; -webkit-text-fill-color: #5b21b6; cursor: default; }
-
-.bazar-date-suffix {
-    font-size: 0.8rem;
-    font-weight: 700;
-    color: #8b5cf6;
-    opacity: 0.85;
-    white-space: nowrap;
-    margin-left: 1px;
-}
-
-.bazar-date-name-input {
-    width: 100%;
-    min-width: 0;
-    border: none;
-    background: transparent;
-    text-align: right;
-    font-family: 'DM Sans', sans-serif;
-    font-size: 14px;
-    font-weight: 600;
-    color: #4c1d95;
-    padding: 0 4px;
-}
-.bazar-date-name-input::placeholder { color: #a78bfa; opacity: 0.7; font-weight: 500; }
-.bazar-date-name-input:focus { outline: none; }
-.bazar-date-name-input:disabled { opacity: 1; -webkit-text-fill-color: #4c1d95; cursor: default; }
-
-.bazar-date-row-delete {
-    width: 24px; height: 24px;
-    margin-top: 0;
-    color: #5b21b6;
-}
-
-.bazar-date-lock-icon {
-    width: 24px; height: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #a78bfa;
-    font-size: 11px;
-    opacity: 0.75;
-}
-
-.bazar-date-row-locked { background: rgba(124,58,237,0.05); border-radius: 8px; }
-.bazar-date-row-locked .bazar-date-input-wrap { opacity: 0.85; }
-
 .panel-close-btn {
     width: 28px; height: 28px;
     border-radius: 9999px;
@@ -733,8 +637,6 @@ input[type=number]::-webkit-inner-spin-button {
 .bazar-panel .panel-close-btn:hover { background: rgba(22,163,74,0.28); }
 .deposit-panel .panel-close-btn { background: rgba(37,99,235,0.15); color: #1e40af; }
 .deposit-panel .panel-close-btn:hover { background: rgba(37,99,235,0.28); }
-.bazar-date-panel .panel-close-btn { background: rgba(124,58,237,0.15); color: #5b21b6; }
-.bazar-date-panel .panel-close-btn:hover { background: rgba(124,58,237,0.28); }
 
 /* ── FAB ────────────────────────────────────────────────────── */
 #floatingButton {
@@ -897,8 +799,8 @@ input[type=number]::-webkit-inner-spin-button {
     .grand-total-row td { padding: 8px; font-size: 0.72rem; }
 
     /* Panels */
-    .notes-panel, .bazar-panel, .deposit-panel, .bazar-date-panel { border-radius: 12px; margin-top: 12px; }
-    .notes-toolbar, .bazar-toolbar, .deposit-toolbar, .bazar-date-toolbar { padding: 10px 14px; }
+    .notes-panel, .bazar-panel, .deposit-panel { border-radius: 12px; margin-top: 12px; }
+    .notes-toolbar, .bazar-toolbar, .deposit-toolbar { padding: 10px 14px; }
     .cost-editor { padding: 6px 10px 14px; }
     .cost-row { grid-template-columns: 1fr 92px 24px; column-gap: 6px; min-height: 42px; }
     .cost-desc-input { font-size: 13.5px; }
@@ -913,15 +815,6 @@ input[type=number]::-webkit-inner-spin-button {
     }
     .deposit-name { font-size: 0.78rem; }
     .deposit-input { height: 32px; font-size: 0.78rem; padding: 0 8px; }
-
-    /* Bazarer Date */
-    .bazar-date-editor { padding: 6px 10px 14px; }
-    .bazar-date-row { grid-template-columns: 84px 1fr 22px; column-gap: 6px; min-height: 40px; padding: 8px 2px; }
-    .bazar-date-input-wrap { height: 30px; padding: 0 6px; }
-    .bazar-date-day-input { width: 20px; font-size: 0.78rem; }
-    .bazar-date-suffix { font-size: 0.68rem; }
-    .bazar-date-name-input { font-size: 12.5px; }
-    .bazar-date-hint { font-size: 0.68rem; }
 
     /* FAB — icon only */
     #floatingButton { bottom: 16px; right: 12px; padding: 12px 14px; }
