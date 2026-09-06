@@ -1292,40 +1292,35 @@ async function openMonth(date) {
     const activeRef = monthDocRef;
 
     const handleSnap = async (snap) => {
-        if (!snap.exists()) {
-            applyDefaultMonth();
-            renderBazarCost(); renderNotes(); renderDeposits();
-            updateManagerUI();
-            // Only manager can init a new month document
-            if (isManagerMode) await saveFields(buildInitialFields(), false);
-        } else {
-            applyMonthData(snap.val()||{});
-            computeManagerMode();
-                } else {
-            applyMonthData(snap.val()||{});
-            computeManagerMode();
-            renderBazarCost(); renderNotes(); renderDeposits();
-            updateManagerUI();
+    if (!snap.exists()) {
+        applyDefaultMonth();
+        renderBazarCost(); renderNotes(); renderDeposits();
+        updateManagerUI();
+        // Only manager can init a new month document
+        if (isManagerMode) await saveFields(buildInitialFields(), false);
+    } else {
+        applyMonthData(snap.val()||{});
+        computeManagerMode();
+        renderBazarCost(); renderNotes(); renderDeposits();
+        updateManagerUI();
 
-            if (!cleanupAttempted) {
-                cleanupAttempted = true;
-                if (isManagerMode) {
-                    cleanupOldMonths().catch(err => console.error("cleanupOldMonths failed", err));
-                }
+        if (!cleanupAttempted) {
+            cleanupAttempted = true;
+            if (isManagerMode) {
+                cleanupOldMonths().catch(err => console.error("cleanupOldMonths failed", err));
             }
         }
-        }
-        hideSkeleton();
-    };
+    }
+    hideSkeleton();
+};
 
-    activeRef.on("value", handleSnap, err => {
-        console.error(err);
-        showMessage("Sync error", true);
-        hideSkeleton();
-    });
-    unsubscribeMonth = ()=>activeRef.off("value", handleSnap);
-}
-
+activeRef.on("value", handleSnap, err => {
+    console.error(err);
+    showMessage("Sync error", true);
+    hideSkeleton();
+});
+unsubscribeMonth = ()=>activeRef.off("value", handleSnap);
+    
 // ── Event handlers ────────────────────────────────────────────
 // Fires on every keystroke (not just on blur), so a name change is saved
 // within ~400ms without the manager needing to click elsewhere. Table is
