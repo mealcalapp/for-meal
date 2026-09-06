@@ -986,7 +986,7 @@ input[type=number]::-webkit-inner-spin-button {
     }
     .bazardate-date-block { grid-area: date; flex-direction: row; align-items: center; gap: 5px; }
     .bazardate-row-trailing { grid-area: trailing; justify-content: flex-end; }
-    .bazardate-name-input { grid-area: name; font-size: 13.5px; }
+    .bazardate-name-input { grid-area: name; font-size: 13.5px; text-align: center; }
     .bazardate-date-input-wrap { height: 32px; }
     .bazardate-day-input { font-size: 0.82rem; }
     .bazardate-date-suffix { font-size: 0.76rem; }
