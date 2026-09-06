@@ -729,7 +729,7 @@ input[type=number]::-webkit-inner-spin-button {
 }
 
 .bazardate-day-label {
-    font-size: 0.7rem;
+    font-size: 0.85rem;
     font-weight: 700;
     color: #7c3aed;
     padding-left: 2px;
@@ -989,7 +989,7 @@ input[type=number]::-webkit-inner-spin-button {
     .bazardate-date-input-wrap { height: 32px; }
     .bazardate-day-input { font-size: 0.82rem; }
     .bazardate-date-suffix { font-size: 0.76rem; }
-    .bazardate-day-label { font-size: 0.68rem; }
+    .bazardate-day-label { font-size: 0.78rem; }
 
     /* FAB — icon only */
     #floatingButton { bottom: 16px; right: 12px; padding: 12px 14px; }
