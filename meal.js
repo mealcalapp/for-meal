@@ -150,6 +150,25 @@ function canEditBazarDateRow(row) {
 }
 function canAddBazarDate() { return isManagerMode || !isReadOnlyForUser(); }
 
+// The date field is now "type just the day, month/year auto-fill" (e.g.
+// type "06", shown as "06 /09/26") instead of a native date picker —
+// month/year always come from whichever month is currently open.
+function getBazarDateSuffix() {
+    const mm = String(selectedMonthDate.getMonth()+1).padStart(2,"0");
+    const yy = String(selectedMonthDate.getFullYear()).slice(-2);
+    return `/${mm}/${yy}`;
+}
+function getBazarDateDayPart(dateStr) {
+    const d = parseISODateLocal(dateStr);
+    return d ? String(d.getDate()).padStart(2,"0") : "";
+}
+function buildBazarDateFromDay(dayNum) {
+    if (!Number.isInteger(dayNum) || dayNum < 1 || dayNum > selectedMonthDays) return "";
+    const y = selectedMonthDate.getFullYear();
+    const m = selectedMonthDate.getMonth();
+    return `${y}-${String(m+1).padStart(2,"0")}-${String(dayNum).padStart(2,"0")}`;
+}
+
 // ── Number helpers ────────────────────────────────────────────
 function parseInput(v) { const n=parseFloat(v); return Number.isFinite(n)&&n>=0?n:0; }
 function formatNumber(n) { return Number.isInteger(n)?String(n):n.toFixed(1); }
@@ -702,9 +721,17 @@ function renderBazarDates() {
     if (!bazarDatePanel || !bazarDateRowsContainer) return;
     bazarDatePanel.classList.toggle("visible", isBazarDateVisible);
 
-    // Same fix as the cost rows / deposits: don't tear down a row while
-    // someone is actively typing in it (echo of our own debounced save).
-    if (bazarDateRowsContainer.contains(document.activeElement)) return;
+    // Only skip the rebuild while someone is actively TYPING in a day or
+    // name field (so a Firebase echo of our own save doesn't yank the
+    // cursor mid-keystroke). A focused delete button must NOT trigger
+    // this skip, or clicking delete would splice the row out of the
+    // array but never rebuild the DOM to reflect it — which is exactly
+    // what made the ✕ button look broken.
+    const active = document.activeElement;
+    if (active && bazarDateRowsContainer.contains(active) &&
+        (active.classList.contains("bazardate-day-input") || active.classList.contains("bazardate-name-input"))) {
+        return;
+    }
 
     if (bazarDates.length === 0) bazarDates.push({ id: nextBazarDateRowId(), date: "", names: "" });
 
@@ -718,6 +745,8 @@ function renderBazarDates() {
         return a.date < b.date ? -1 : a.date > b.date ? 1 : 0;
     });
 
+    const suffix = getBazarDateSuffix();
+
     bazarDateRowsContainer.innerHTML = "";
     ordered.forEach(row => {
         const editable = canEditBazarDateRow(row);
@@ -729,22 +758,35 @@ function renderBazarDates() {
         const dateBlock = document.createElement("div");
         dateBlock.className = "bazardate-date-block";
 
-        const dateInput = document.createElement("input");
-        dateInput.type = "date";
-        dateInput.className = "bazardate-date-input";
-        dateInput.value = row.date || "";
-        dateInput.disabled = !editable;
+        const dateWrap = document.createElement("div");
+        dateWrap.className = "bazardate-date-input-wrap";
+
+        const dayInput = document.createElement("input");
+        dayInput.type = "text";
+        dayInput.inputMode = "numeric";
+        dayInput.pattern = "[0-9]*";
+        dayInput.maxLength = 2;
+        dayInput.className = "bazardate-day-input";
+        dayInput.placeholder = "DD";
+        dayInput.value = getBazarDateDayPart(row.date);
+        dayInput.disabled = !editable;
+
+        const suffixSpan = document.createElement("span");
+        suffixSpan.className = "bazardate-date-suffix";
+        suffixSpan.textContent = suffix;
+
+        dateWrap.append(dayInput, suffixSpan);
 
         const dayLabel = document.createElement("div");
         dayLabel.className = "bazardate-day-label";
-        dayLabel.textContent = formatBazarDateDisplay(row.date);
+        dayLabel.textContent = row.date ? formatBazarDateDisplay(row.date) : "Pick a day";
 
-        dateBlock.append(dateInput, dayLabel);
+        dateBlock.append(dateWrap, dayLabel);
 
         const nameInput = document.createElement("input");
         nameInput.type = "text";
         nameInput.className = "bazardate-name-input";
-        nameInput.placeholder = "Bazar karir nam";
+        nameInput.placeholder = "Bazar Karir Nam";
         nameInput.value = row.names || "";
         nameInput.disabled = !editable;
 
@@ -802,10 +844,13 @@ function handleBazarDateInput(event) {
     const row = findBazarDateRow(rowEl.dataset.rowId);
     if (!row || !canEditBazarDateRow(row)) return;
 
-    if (target.classList.contains("bazardate-date-input")) {
-        row.date = target.value || "";
+    if (target.classList.contains("bazardate-day-input")) {
+        const digits = target.value.replace(/\D/g,"").slice(0,2);
+        if (digits !== target.value) target.value = digits;
+        const dayNum = digits === "" ? NaN : parseInt(digits,10);
+        row.date = buildBazarDateFromDay(dayNum);
         const label = rowEl.querySelector(".bazardate-day-label");
-        if (label) label.textContent = formatBazarDateDisplay(row.date);
+        if (label) label.textContent = row.date ? formatBazarDateDisplay(row.date) : "Pick a day";
     } else if (target.classList.contains("bazardate-name-input")) {
         row.names = target.value;
     } else {
@@ -819,7 +864,7 @@ function handleBazarDateInput(event) {
 
 function handleBazarDateBlur(event) {
     const target = event.target;
-    if (!target.classList || (!target.classList.contains("bazardate-date-input") && !target.classList.contains("bazardate-name-input"))) return;
+    if (!target.classList || (!target.classList.contains("bazardate-day-input") && !target.classList.contains("bazardate-name-input"))) return;
     const rowEl = target.closest(".bazardate-row");
     const row = rowEl && findBazarDateRow(rowEl.dataset.rowId);
     if (!row || !canEditBazarDateRow(row)) return;
@@ -836,13 +881,17 @@ function handleBazarDateClick(event) {
     if (idx === -1) return;
     bazarDates.splice(idx, 1);
     if (bazarDates.length === 0) bazarDates.push({ id: nextBazarDateRowId(), date: "", names: "" });
+    // Move focus off the (about-to-be-removed) delete button first so the
+    // active-element check above never sees it as "still being edited".
+    if (document.activeElement === delBtn) delBtn.blur();
     renderBazarDates();
     saveBazarDates(true).catch(err => { console.error(err); showMessage("Save failed", true); });
 }
 
 function handleBazarDateAddRow() {
     if (!canAddBazarDate()) return;
-    const row = { id: nextBazarDateRowId(), date: todayISO(), names: "" };
+    const defaultDay = isCurrentMonthView() ? getTodayDay() : null;
+    const row = { id: nextBazarDateRowId(), date: defaultDay ? buildBazarDateFromDay(defaultDay) : "", names: "" };
     bazarDates.push(row);
     renderBazarDates();
     const input = bazarDateRowsContainer?.querySelector(`.bazardate-row[data-row-id="${row.id}"] .bazardate-name-input`);
