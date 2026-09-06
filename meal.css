@@ -749,6 +749,7 @@ input[type=number]::-webkit-inner-spin-button {
     color: #3b0764;
     padding: 0 10px;
     align-self: center;
+    text-align: center;
 }
 .bazardate-name-input::placeholder { color: #a78bfa; opacity: 0.9; }
 .bazardate-name-input:focus { outline: none; border-color: rgba(124,58,237,0.6); box-shadow: 0 0 0 2px rgba(124,58,237,0.18); background: rgba(255,255,255,0.85); }
