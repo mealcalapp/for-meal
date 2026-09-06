@@ -1738,7 +1738,6 @@ async function boot() {
 
         await loadMonthOptions();
         await openMonth(selectedMonthDate);
-       
         updateManagerUI();
         hideSkeleton();
 
