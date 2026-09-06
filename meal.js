@@ -129,7 +129,7 @@ function formatBazarDateDisplay(str) {
     const mm = String(d.getMonth()+1).padStart(2,"0");
     const yy = String(d.getFullYear()).slice(-2);
     const weekday = d.toLocaleDateString("en-US", { weekday: "long" });
-    return `${dd}-${mm}-${yy} ${weekday}`;
+    return weekday;
 }
 // No date entered yet (brand-new row) is never treated as "past" — it's
 // only locked once a real date has actually elapsed.
