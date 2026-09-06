@@ -744,7 +744,7 @@ function renderBazarDates() {
         const nameInput = document.createElement("input");
         nameInput.type = "text";
         nameInput.className = "bazardate-name-input";
-        nameInput.placeholder = "Who went? e.g. Mamun Bhai + Asaduzzam Bhai";
+        nameInput.placeholder = "Bazar karir nam";
         nameInput.value = row.names || "";
         nameInput.disabled = !editable;
 
