@@ -1297,8 +1297,10 @@ function updateTotal(pi) {
                 <div class="total-cell-tm flex justify-between gap-2"><span>Real:</span><span>${formatNumber(tm)}</span></div>
                 <div class="total-cell-gm flex justify-between gap-2"><span>Guest:</span><span>${formatNumber(gm)}</span></div>
                 <div class="total-cell-combined flex justify-between gap-2"><span>T:M:</span><span>${formatNumber(tc)}</span></div>
-                ${toggleHTML}
-                ${customInputHTML}
+                <div style="display:flex;flex-direction:column;gap:4px;">
+                    ${toggleHTML}
+                    ${customInputHTML}
+                </div>
             </div>`;
 
         if (isManagerMode) {
