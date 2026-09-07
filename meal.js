@@ -218,7 +218,8 @@ function getDefaultMember(i) {
         guestMeals: Array(MAX_DAYS).fill(0),
         mealLocked: Array(MAX_DAYS).fill(false),
         guestMealLocked: Array(MAX_DAYS).fill(false),
-        fixedMealOff: false
+        fixedMealOff: false,
+        customFixedMeal: null
     };
 }
 
@@ -233,6 +234,9 @@ function normalizeMember(m, i) {
     const base = getDefaultMember(i);
     const s = m&&typeof m==="object"?m:{};
     const name = typeof s.name==="string"&&s.name.trim()?s.name.trim():base.name;
+    const customFixedMeal = (typeof s.customFixedMeal==="number" && Number.isFinite(s.customFixedMeal) && s.customFixedMeal>=0)
+        ? s.customFixedMeal
+        : null;
     return {
         name,
         nameLocked: Boolean(s.nameLocked),
@@ -240,7 +244,8 @@ function normalizeMember(m, i) {
         guestMeals: normalizeArray(s.guestMeals,MAX_DAYS,0).map(parseInput),
         mealLocked: normalizeArray(s.mealLocked,MAX_DAYS,false).map(Boolean),
         guestMealLocked: normalizeArray(s.guestMealLocked,MAX_DAYS,false).map(Boolean),
-        fixedMealOff: Boolean(s.fixedMealOff)
+        fixedMealOff: Boolean(s.fixedMealOff),
+        customFixedMeal
     };
 }
 
@@ -1225,23 +1230,42 @@ function sumByDays(arr) {
     return arr.slice(0,selectedMonthDays).reduce((s,v)=>s+parseInput(v),0);
 }
 
+function getEffectiveFixedMeal(person) {
+    const custom = person.customFixedMeal;
+    return (typeof custom === "number" && Number.isFinite(custom) && custom >= 0) ? custom : fixedMeal;
+}
+
 function getBillingTotal(person) {
     const real  = sumByDays(person.meals);
     const guest = sumByDays(person.guestMeals);
     const hasStartedEating = real > 0;          // no meal entered yet? no floor yet
     const floorApplies     = hasStartedEating && !person.fixedMealOff;
-    const billed = floorApplies ? (real < fixedMeal ? fixedMeal : real) : real;
+    const floor  = getEffectiveFixedMeal(person);
+    const billed = floorApplies ? (real < floor ? floor : real) : real;
     return billed + guest;
 }
 
 function updateTotal(pi) {
     const person = mealData[pi];
+    const cell = document.getElementById(`total-display-${pi}`);
+
+    // Don't rebuild this cell out from under an in-progress custom-fixed-meal
+    // edit — same focus-preservation pattern used elsewhere in this file.
+    // Just patch the "T:M" figure and grand total live; the full render
+    // (including normalizing whatever's in the input) catches up on blur.
+    if (cell && cell.contains(document.activeElement) && document.activeElement.classList.contains("fm-custom-input")) {
+        const tcEl = cell.querySelector(".total-cell-combined span:last-child");
+        if (tcEl) tcEl.textContent = formatNumber(getBillingTotal(person));
+        updateGrandTotal();
+        return;
+    }
+
     const tm = sumByDays(person.meals);
     const gm = sumByDays(person.guestMeals);
     const tc = getBillingTotal(person);
-    const cell = document.getElementById(`total-display-${pi}`);
     if (cell) {
         const fmOff = Boolean(person.fixedMealOff);
+        const hasCustom = typeof person.customFixedMeal === "number";
         const toggleHTML = isManagerMode
             ? `<button class="fm-toggle-btn" data-person="${pi}"
                  title="${fmOff ? 'Fixed Meal is OFF for this member — click to enable' : 'Fixed Meal is ON — click to disable (bill by real meals only)'}"
@@ -1251,7 +1275,22 @@ function updateTotal(pi) {
                         background:${fmOff ? '#fef2f2' : '#f0fdf4'};">
                  FM: ${fmOff ? 'OFF' : 'ON'}
                </button>`
-            : (fmOff ? `<div style="margin-top:5px;font-size:10px;font-weight:700;color:#f43f5e;text-align:center;">FM: OFF</div>` : '');
+            : (fmOff
+                ? `<div style="margin-top:5px;font-size:10px;font-weight:700;color:#f43f5e;text-align:center;">FM: OFF</div>`
+                : (hasCustom
+                    ? `<div style="margin-top:5px;font-size:10px;font-weight:700;color:#0369a1;text-align:center;">Fixed: ${formatNumber(getEffectiveFixedMeal(person))}</div>`
+                    : ''));
+
+        // Manager-only, and only while Fixed Meal is actually ON for this
+        // member — lets a manager give this one person their own fixed-meal
+        // floor (e.g. 30/40) instead of the shared value, without affecting
+        // anyone else. Blank = follow the shared Fixed Meal amount.
+        const customInputHTML = (isManagerMode && !fmOff)
+            ? `<input type="number" class="fm-custom-input" data-person="${pi}" min="0" inputmode="decimal"
+                 placeholder="${formatNumber(fixedMeal)}" value="${hasCustom ? person.customFixedMeal : ''}"
+                 title="Custom fixed meal for this member only (blank = shared ${formatNumber(fixedMeal)})"
+                 style="margin-top:4px;width:100%;font-size:10px;font-weight:700;text-align:center;padding:3px 4px;border-radius:6px;border:1px solid #94a3b8;background:#f8fafc;color:#0f172a;">`
+            : '';
 
         cell.innerHTML = `
             <div class="p-2" style="min-width:75px;">
@@ -1259,6 +1298,7 @@ function updateTotal(pi) {
                 <div class="total-cell-gm flex justify-between gap-2"><span>Guest:</span><span>${formatNumber(gm)}</span></div>
                 <div class="total-cell-combined flex justify-between gap-2"><span>T:M:</span><span>${formatNumber(tc)}</span></div>
                 ${toggleHTML}
+                ${customInputHTML}
             </div>`;
 
         if (isManagerMode) {
@@ -1266,6 +1306,11 @@ function updateTotal(pi) {
             if (btn) btn.addEventListener("click", () => {
                 handleToggleFixedMeal(pi).catch(err => { console.error(err); showMessage("Failed", true); });
             });
+            const customInput = cell.querySelector(".fm-custom-input");
+            if (customInput) {
+                customInput.addEventListener("input", handleCustomFixedMealInput);
+                customInput.addEventListener("blur",  handleCustomFixedMealBlur);
+            }
         }
     }
     updateGrandTotal();
@@ -1558,6 +1603,35 @@ async function handleToggleFixedMeal(pi) {
     member.fixedMealOff = !member.fixedMealOff;
     updateTotal(pi);
     await saveFields({ [`members/${pi}/fixedMealOff`]: member.fixedMealOff }, true);
+}
+
+// Per-member override for the shared Fixed Meal floor (e.g. shared is 50,
+// but this one member should be floored at 30/40 instead). Blank clears
+// the override and falls back to the shared amount — see
+// getEffectiveFixedMeal. Fires on every keystroke like handleMealInputChange;
+// the network save is debounced, updateTotal() is guarded against rebuilding
+// this very input mid-keystroke (see the focus check inside updateTotal).
+function handleCustomFixedMealInput(event) {
+    if (!isManagerMode || isReadOnlyForUser()) return;
+    const input = event.target;
+    const pi = parseInt(input.dataset.person, 10);
+    const member = mealData[pi];
+    if (!member) return;
+    const raw = input.value.trim();
+    member.customFixedMeal = raw === "" ? null : parseInput(raw);
+    updateTotal(pi);
+    debounceKeyed(`customFixedMeal-${pi}`, () => {
+        saveFields({ [`members/${pi}/customFixedMeal`]: member.customFixedMeal }, true)
+            .catch(err => { console.error(err); showMessage("Save failed", true); });
+    }, 350);
+}
+
+// Once the manager is done typing, do a full re-render of the cell so the
+// input reflects the normalized value (e.g. a cleared field snapping back
+// to blank/placeholder rather than whatever partial text was left).
+function handleCustomFixedMealBlur(event) {
+    const pi = parseInt(event.target.dataset.person, 10);
+    if (Number.isInteger(pi)) updateTotal(pi);
 }
 
 async function handleFixedMealSave() {
