@@ -83,7 +83,7 @@ let isDepositVisible   = false;
 let isBazarDateVisible = false;
 let bazarCostText      = "";
 let monthNote          = "";
-let bazarRows          = [];   // parsed rows for the Bazar Cost notepad editor
+let bazarRows          = [];   // legacy/unused now that Bazar Cost rows are derived from bazarDates (see renderBazarCostRows) — kept only so the shared notepad-row helpers below still type-check for "notes"
 let noteRows           = [];   // parsed rows for the Additional Cost notepad editor
 let costRowSeq         = 0;
 let depositData        = [];
@@ -131,6 +131,16 @@ function formatBazarDateDisplay(str) {
     const yy = String(d.getFullYear()).slice(-2);
     const weekday = d.toLocaleDateString("en-US", { weekday: "long" });
     return weekday;
+}
+// "DD/MM/YY" form used to mirror a Bazarer Date row into Bazar Cost
+// (e.g. "01/09/26"), distinct from formatBazarDateDisplay's weekday label.
+function formatBazarDateDDMMYY(str) {
+    const d = parseISODateLocal(str);
+    if (!d) return "";
+    const dd = String(d.getDate()).padStart(2,"0");
+    const mm = String(d.getMonth()+1).padStart(2,"0");
+    const yy = String(d.getFullYear()).slice(-2);
+    return `${dd}/${mm}/${yy}`;
 }
 // No date entered yet (brand-new row) is never treated as "past" — it's
 // only locked once a real date has actually elapsed.
@@ -260,7 +270,8 @@ function normalizeBazarDates(raw) {
         .map(r => ({
             id: typeof r.id==="string" && r.id ? r.id : nextBazarDateRowId(),
             date: typeof r.date==="string" ? r.date : "",
-            names: typeof r.names==="string" ? r.names : ""
+            names: typeof r.names==="string" ? r.names : "",
+            amount: parseCostAmount(r.amount)
         }));
 }
 
@@ -364,25 +375,11 @@ function updateHeaderAndNotice() {
 }
 
 // ── Render panels ─────────────────────────────────────────────
+// Bazar Cost rows are now derived straight from bazarDates — see
+// renderBazarCostRows() further down, next to the rest of the
+// Bazarer Date → Bazar Cost sync logic.
 function renderBazarCost() {
-    bazarPanel.classList.toggle("visible", isBazarVisible);
-    if (bazarEditor) {
-        bazarEditor.value = bazarCostText;
-        bazarEditor.disabled = !isManagerMode || isReadOnlyForUser();
-    }
-    // While the manager is actively typing inside a row, skip rebuilding
-    // the DOM entirely — a Firebase echo of our own (debounced) save would
-    // otherwise tear down and recreate the focused input mid-keystroke,
-    // which is what causes the cursor to jump/keyboard to flicker on
-    // mobile. The row already shows what they typed; the save still
-    // happens in the background regardless. We pick up any genuinely
-    // remote change once they move away from the field (blur → save →
-    // next render finds nothing focused here and reparses normally).
-    if (bazarRowsContainer && bazarRowsContainer.contains(document.activeElement)) return;
-    if (serializeRows(bazarRows) !== bazarCostText) {
-        bazarRows = parseRowsFromText(bazarCostText);
-    }
-    renderCostRows("bazar");
+    renderBazarCostRows();
 }
 
 function renderNotes() {
@@ -719,6 +716,26 @@ function updateDepositTotal() {
 // row for today or a future date; once that date passes, only the
 // Manager/Super Admin can still touch that specific row (see
 // canEditBazarDateRow above) — editability is per-row, not per-month.
+// A brand-new month (or one with every row deleted) always keeps at
+// least one blank editable row around, both here and in Bazar Cost.
+function ensureBazarDatesNotEmpty() {
+    if (bazarDates.length === 0) bazarDates.push({ id: nextBazarDateRowId(), date: "", names: "", amount: null });
+}
+
+// Shared ordering (date order, blank/undated rows last) used by both the
+// Bazarer Date panel and the Bazar Cost panel below, so the two stay in
+// perfect lock-step without reordering the underlying array (Firebase
+// array indices don't need to match display order here).
+function orderBazarDates() {
+    ensureBazarDatesNotEmpty();
+    return [...bazarDates].sort((a,b) => {
+        if (!a.date && !b.date) return 0;
+        if (!a.date) return 1;
+        if (!b.date) return -1;
+        return a.date < b.date ? -1 : a.date > b.date ? 1 : 0;
+    });
+}
+
 function renderBazarDates() {
     if (!bazarDatePanel || !bazarDateRowsContainer) return;
     bazarDatePanel.classList.toggle("visible", isBazarDateVisible);
@@ -735,18 +752,7 @@ function renderBazarDates() {
         return;
     }
 
-    if (bazarDates.length === 0) bazarDates.push({ id: nextBazarDateRowId(), date: "", names: "" });
-
-    // Render in date order (blank/undated rows last) without reordering
-    // the underlying array, since Firebase array indices don't need to
-    // match display order here.
-    const ordered = [...bazarDates].sort((a,b) => {
-        if (!a.date && !b.date) return 0;
-        if (!a.date) return 1;
-        if (!b.date) return -1;
-        return a.date < b.date ? -1 : a.date > b.date ? 1 : 0;
-    });
-
+    const ordered = orderBazarDates();
     const suffix = getBazarDateSuffix();
 
     bazarDateRowsContainer.innerHTML = "";
@@ -816,17 +822,21 @@ function renderBazarDates() {
     if (bazarDateAddRowBtn) bazarDateAddRowBtn.disabled = !canAddBazarDate();
 }
 
-// Writes ONLY the bazarDates array. Unlike saveFields(), this is
-// intentionally NOT gated behind isManagerMode — normal members are
-// meant to be able to log a bazar date/name themselves. Per-row edit
-// permission is enforced before this is ever called (see
-// canEditBazarDateRow / the handlers below); real enforcement against a
-// malicious client still belongs in Firebase Security Rules, same
-// caveat as the rest of this file.
+// Writes the bazarDates array AND the bazarCost text mirror derived from
+// it (see regenerateBazarCostText) in the same update, so the two never
+// drift apart. Unlike saveFields(), this is intentionally NOT gated
+// behind isManagerMode — normal members are meant to be able to log a
+// bazar date/name themselves, and that should be reflected in Bazar Cost
+// immediately too. Per-row edit permission is enforced before this is
+// ever called (see canEditBazarDateRow / the handlers below); real
+// enforcement against a malicious client still belongs in Firebase
+// Security Rules, same caveat as the rest of this file. Only the ৳
+// amount itself stays manager-gated — see saveBazarCostAmounts below.
 async function saveBazarDates(showFeedback=false) {
     if (isReadOnlyForUser() && !isManagerMode) return; // whole-month history: blocked for non-admins
     const monthKey = getMonthKey(selectedMonthDate);
-    const payload = { bazarDates, updatedAt: Date.now() };
+    regenerateBazarCostText();
+    const payload = { bazarDates, bazarCost: bazarCostText, updatedAt: Date.now() };
     if (!db) {
         mergeLocalFields(monthKey, payload);
         if (showFeedback) showMessage("Saved!");
@@ -859,6 +869,11 @@ function handleBazarDateInput(event) {
         return;
     }
 
+    // Live-mirror the date/name text into Bazar Cost as they type, so the
+    // row already reads e.g. "01/09/26 Jsim+Karim" the moment it's typed
+    // here — the actual DB write is still debounced below.
+    renderBazarCostRows();
+
     debounceKeyed("bazarDates", () => {
         saveBazarDates().catch(err => { console.error(err); showMessage("Save failed", true); });
     }, 400);
@@ -882,22 +897,159 @@ function handleBazarDateClick(event) {
     const idx = bazarDates.findIndex(r => r.id === row.id);
     if (idx === -1) return;
     bazarDates.splice(idx, 1);
-    if (bazarDates.length === 0) bazarDates.push({ id: nextBazarDateRowId(), date: "", names: "" });
+    ensureBazarDatesNotEmpty();
     // Move focus off the (about-to-be-removed) delete button first so the
     // active-element check above never sees it as "still being edited".
     if (document.activeElement === delBtn) delBtn.blur();
     renderBazarDates();
+    renderBazarCostRows();
     saveBazarDates(true).catch(err => { console.error(err); showMessage("Save failed", true); });
 }
 
 function handleBazarDateAddRow() {
     if (!canAddBazarDate()) return;
     const defaultDay = isCurrentMonthView() ? getTodayDay() : null;
-    const row = { id: nextBazarDateRowId(), date: defaultDay ? buildBazarDateFromDay(defaultDay) : "", names: "" };
+    const row = { id: nextBazarDateRowId(), date: defaultDay ? buildBazarDateFromDay(defaultDay) : "", names: "", amount: null };
     bazarDates.push(row);
     renderBazarDates();
+    renderBazarCostRows();
     const input = bazarDateRowsContainer?.querySelector(`.bazardate-row[data-row-id="${row.id}"] .bazardate-name-input`);
     if (input) input.focus();
+}
+
+// ── Bazar Cost — derived 1:1 from Bazarer Date ─────────────────
+// Bazar Cost no longer has its own independent list of names: every row
+// in Bazarer Date produces exactly one mirrored row here, with the exact
+// same date + name text (e.g. a Bazarer Date row "01/09/26  Jsim+Karim"
+// shows up here as "01/09/26 Jsim+Karim"). Nobody adds/removes/renames a
+// row from inside Bazar Cost any more — that all happens over in
+// Bazarer Date. The Manager/Super Admin's only job here is typing in the
+// ৳ amount for each row.
+function formatBazarCostLabel(row) {
+    const datePart = formatBazarDateDDMMYY(row.date);
+    const namesPart = (row.names || "").trim();
+    return [datePart, namesPart].filter(Boolean).join(" ");
+}
+
+// Mirrors parseCostLine's "desc = amount" / "- desc" format so the saved
+// bazarCost text stays readable by /for-all's totals page exactly like
+// before, just with the description always sourced from the linked
+// Bazarer Date row instead of being typed independently.
+function buildBazarCostLineForDate(row) {
+    const desc = escapeDescForStorage(formatBazarCostLabel(row));
+    if (!desc) return null;
+    if (row.amount !== null && Number.isFinite(row.amount)) {
+        return `${desc} = ${formatNumber(row.amount)}`;
+    }
+    return `- ${desc}`;
+}
+
+function regenerateBazarCostText() {
+    bazarCostText = orderBazarDates()
+        .map(buildBazarCostLineForDate)
+        .filter(line => line !== null)
+        .join("\n");
+}
+
+function sumBazarDateAmounts() {
+    return bazarDates.reduce((s, r) => s + (Number.isFinite(r.amount) ? r.amount : 0), 0);
+}
+
+function renderBazarCostRows() {
+    if (!bazarPanel) return;
+    bazarPanel.classList.toggle("visible", isBazarVisible);
+    if (!bazarRowsContainer) return;
+
+    const editable = isManagerMode && !isReadOnlyForUser();
+
+    // Same focus-preservation pattern as the rest of the app: while the
+    // manager is actively typing an amount, just keep the live total
+    // ticking over and skip the full rebuild so a Firebase echo of our
+    // own save doesn't yank the cursor mid-keystroke.
+    const active = document.activeElement;
+    if (active && bazarRowsContainer.contains(active) && active.classList.contains("cost-amount-input")) {
+        if (bazarCostTotalEl) bazarCostTotalEl.textContent = `৳ ${formatNumber(sumBazarDateAmounts())}`;
+        return;
+    }
+
+    // Only rows that actually have a date and/or a name typed in Bazarer
+    // Date show up here — an untouched blank placeholder row has nothing
+    // to attach an amount to yet.
+    const ordered = orderBazarDates().filter(row => row.date || (row.names || "").trim());
+
+    bazarRowsContainer.innerHTML = "";
+    ordered.forEach(row => {
+        const rowEl = document.createElement("div");
+        rowEl.className = "cost-row";
+        rowEl.dataset.rowId = row.id;
+
+        const descEl = document.createElement("div");
+        descEl.className = "cost-desc-input cost-desc-display";
+        descEl.textContent = formatBazarCostLabel(row);
+        descEl.title = "Set from Bazarer Date";
+
+        const amountWrap = document.createElement("div");
+        amountWrap.className = "cost-amount-wrap";
+        const currency = document.createElement("span");
+        currency.className = "cost-currency";
+        currency.textContent = "৳";
+        const amountInput = document.createElement("input");
+        amountInput.type = "number";
+        amountInput.className = "cost-amount-input";
+        amountInput.placeholder = "0";
+        amountInput.min = "0";
+        amountInput.step = "any";
+        amountInput.value = row.amount !== null ? row.amount : "";
+        amountInput.disabled = !editable;
+        amountWrap.append(currency, amountInput);
+
+        rowEl.append(descEl, amountWrap);
+        bazarRowsContainer.appendChild(rowEl);
+        autoResizeDescInput(descEl);
+    });
+
+    if (ordered.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "cost-empty-hint";
+        empty.textContent = "Add a date in Bazarer Date to create a row here.";
+        bazarRowsContainer.appendChild(empty);
+    }
+
+    // Rows are only ever created from Bazarer Date now, so there's
+    // nothing left to manually add here.
+    if (bazarAddRowBtn) bazarAddRowBtn.style.display = "none";
+
+    if (bazarCostTotalEl) bazarCostTotalEl.textContent = `৳ ${formatNumber(sumBazarDateAmounts())}`;
+}
+
+// Writes the amount (and, via regenerateBazarCostText, the bazarCost
+// mirror) for the current bazarDates — this IS manager-gated through
+// saveFields, since typing in the ৳ amount is the one thing that's still
+// Manager/Super Admin only in this panel.
+async function saveBazarCostAmounts(showFeedback = false) {
+    regenerateBazarCostText();
+    return saveFields({ bazarCost: bazarCostText, bazarDates }, showFeedback);
+}
+
+function handleBazarCostAmountInput(event) {
+    if (!isManagerMode || isReadOnlyForUser()) return;
+    const target = event.target;
+    if (!target.classList.contains("cost-amount-input")) return;
+    const rowEl = target.closest(".cost-row");
+    const row = rowEl && findBazarDateRow(rowEl.dataset.rowId);
+    if (!row) return;
+    row.amount = parseCostAmount(target.value);
+    if (bazarCostTotalEl) bazarCostTotalEl.textContent = `৳ ${formatNumber(sumBazarDateAmounts())}`;
+    debounceKeyed("bazar-cost-amount", () => {
+        saveBazarCostAmounts().catch(err => { console.error(err); showMessage("Save failed", true); });
+    }, 350);
+}
+
+function handleBazarCostAmountBlur(event) {
+    if (!isManagerMode || isReadOnlyForUser()) return;
+    const target = event.target;
+    if (!target.classList.contains("cost-amount-input")) return;
+    saveBazarCostAmounts(true).catch(err => { console.error(err); showMessage("Save failed", true); });
 }
 
 // ── Table rendering ───────────────────────────────────────────
@@ -1642,13 +1794,13 @@ function bindEvents() {
     }
     if (bazarDateAddRowBtn) bazarDateAddRowBtn.addEventListener("click", handleBazarDateAddRow);
 
+    // Bazar Cost rows are derived from Bazarer Date now (see
+    // renderBazarCostRows) — the only thing still editable in here is the
+    // ৳ amount per row.
     if (bazarRowsContainer) {
-        bazarRowsContainer.addEventListener("input",   e => handleCostRowInput("bazar", e));
-        bazarRowsContainer.addEventListener("blur",    e => handleCostRowBlur("bazar", e), true);
-        bazarRowsContainer.addEventListener("click",   e => handleCostRowClick("bazar", e));
-        bazarRowsContainer.addEventListener("keydown", e => handleCostRowKeydown("bazar", e));
+        bazarRowsContainer.addEventListener("input", handleBazarCostAmountInput);
+        bazarRowsContainer.addEventListener("blur",  handleBazarCostAmountBlur, true);
     }
-    if (bazarAddRowBtn) bazarAddRowBtn.addEventListener("click", () => handleCostAddRow("bazar"));
 
     if (notesRowsContainer) {
         notesRowsContainer.addEventListener("input",   e => handleCostRowInput("notes", e));

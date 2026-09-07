@@ -441,6 +441,18 @@ input[type=number]::-webkit-inner-spin-button {
 .notes-panel .cost-row { border-bottom: 1px solid rgba(217,119,6,0.18); }
 .cost-rows .cost-row:last-child { border-bottom: none; }
 
+/* Bazar Cost rows are mirrored from Bazarer Date and have no delete
+   button of their own (deleting happens over in Bazarer Date instead),
+   so they only need two grid columns: description + amount. */
+.bazar-panel .cost-row { grid-template-columns: 1fr 112px; }
+.cost-desc-display { cursor: default; }
+.cost-empty-hint {
+    padding: 14px 4px;
+    font-size: 13px;
+    color: #6b7280;
+    font-style: italic;
+}
+
 .cost-desc-input {
     width: 100%;
     min-width: 0;
@@ -961,6 +973,7 @@ input[type=number]::-webkit-inner-spin-button {
     .notes-toolbar, .bazar-toolbar, .deposit-toolbar, .bazardate-toolbar { padding: 10px 14px; }
     .cost-editor { padding: 6px 10px 14px; }
     .cost-row { grid-template-columns: 1fr 92px 24px; column-gap: 6px; min-height: 42px; }
+    .bazar-panel .cost-row { grid-template-columns: 1fr 92px; }
     .cost-desc-input { font-size: 13.5px; }
     .cost-amount-wrap { padding: 0 6px; }
     .cost-amount-input { font-size: 0.8rem; }
