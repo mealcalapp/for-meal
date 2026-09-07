@@ -344,6 +344,16 @@
         behavior: "smooth"
       });
     });
+
+    const floatingButton = document.getElementById("floatingButton");
+    
+    window.addEventListener("scroll", () => {
+      if (window.scrollY > 200) {
+        backToTopBtn.classList.add("show");
+      } else {
+        backToTopBtn.classList.remove("show");
+      }
+    });
 </script>
 </body>
 </html>
