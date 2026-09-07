@@ -346,7 +346,7 @@ tbody tr:not(.guest-row):hover .sticky-col-left { background-color: #f1f5f9; }
     cursor: not-allowed;
     background: transparent !important;
     color: #0f172a !important;
-    -webkit-text-fill-color: #0f172a;
+    -webkit-text-fill-color: #cbd5e1;
     opacity: 1;
     position: relative;
 }
