@@ -961,8 +961,9 @@ function handleBazarDateAddRow() {
 // ৳ amount for each row.
 function formatBazarCostLabel(row) {
     const datePart = formatBazarDateDDMMYY(row.date);
+    const dayNamePart = row.date ? formatBazarDateDisplay(row.date) : "";
     const namesPart = (row.names || "").trim();
-    return [datePart, namesPart].filter(Boolean).join(" ");
+    return [datePart, dayNamePart, namesPart].filter(Boolean).join(" ");
 }
 
 // Mirrors parseCostLine's "desc = amount" / "- desc" format so the saved
