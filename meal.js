@@ -149,11 +149,8 @@ function isBazarDatePast(str) {
     if (!d) return false;
     return d.getTime() < parseISODateLocal(todayISO()).getTime();
 }
-// Managers/Super Admin can always edit. Everyone else can add/edit a row
-// as long as its date is today or in the future; once that date has
-// passed, the row locks for normal members (still open to the manager)
-// so history can't be quietly rewritten. Whole-month history view keeps
-// its existing read-only rule for non-super-admins.
+// Manager/Super Admin only — kept this way on purpose, do not loosen to
+// let normal members add/edit rows.
 function canEditBazarDateRow(row) {
     return isManagerMode;
 }
@@ -161,6 +158,7 @@ function canEditBazarDateRow(row) {
 function canAddBazarDate() {
     return isManagerMode;
 }
+
 // The date field is now "type just the day, month/year auto-fill" (e.g.
 // type "06", shown as "06 /09/26") instead of a native date picker —
 // month/year always come from whichever month is currently open.
@@ -756,7 +754,17 @@ function renderBazarDates() {
         return;
     }
 
-    const ordered = orderBazarDates();
+    // NOTE: intentionally NOT orderBazarDates() here. This panel is an
+    // input list, not a report — sorting it by date meant a row's
+    // on-screen position jumped the instant its date changed (or even
+    // mid-keystroke, before the date was finished). The manager would
+    // finish typing a date, tap into what looked like the same row's
+    // name field, and actually be typing into a different row that had
+    // shifted into that screen position. Keeping insertion order fixes
+    // that; orderBazarDates() is still used below for the Bazar Cost
+    // mirror, so that view stays sorted by date as before.
+    ensureBazarDatesNotEmpty();
+    const ordered = bazarDates;
     const suffix = getBazarDateSuffix();
 
     bazarDateRowsContainer.innerHTML = "";
@@ -863,9 +871,19 @@ function handleBazarDateInput(event) {
     if (target.classList.contains("bazardate-day-input")) {
         const digits = target.value.replace(/\D/g,"").slice(0,2);
         if (digits !== target.value) target.value = digits;
-        const dayNum = digits === "" ? NaN : parseInt(digits,10);
-        row.date = buildBazarDateFromDay(dayNum);
         const label = rowEl.querySelector(".bazardate-day-label");
+
+        // A single digit ("1") could still turn into "15" — don't commit
+        // row.date, mirror it into Bazar Cost, or fire a save off just
+        // one digit. Wait for the day to be complete (2 digits); a lone
+        // leftover digit still gets committed on blur (see
+        // handleBazarDateBlur) so e.g. day "5" alone still saves.
+        if (digits.length < 2) {
+            if (label) label.textContent = "Pick a day";
+            return;
+        }
+        const dayNum = parseInt(digits,10);
+        row.date = buildBazarDateFromDay(dayNum);
         if (label) label.textContent = row.date ? formatBazarDateDisplay(row.date) : "Pick a day";
     } else if (target.classList.contains("bazardate-name-input")) {
         row.names = target.value;
@@ -889,6 +907,18 @@ function handleBazarDateBlur(event) {
     const rowEl = target.closest(".bazardate-row");
     const row = rowEl && findBazarDateRow(rowEl.dataset.rowId);
     if (!row || !canEditBazarDateRow(row)) return;
+
+    if (target.classList.contains("bazardate-day-input")) {
+        const digits = target.value.replace(/\D/g,"").slice(0,2);
+        if (digits.length === 1) {
+            const dayNum = parseInt(digits,10);
+            row.date = buildBazarDateFromDay(dayNum);
+            const label = rowEl.querySelector(".bazardate-day-label");
+            if (label) label.textContent = row.date ? formatBazarDateDisplay(row.date) : "Pick a day";
+            renderBazarCostRows();
+        }
+    }
+
     saveBazarDates(true).catch(err => { console.error(err); showMessage("Save failed", true); });
 }
 
