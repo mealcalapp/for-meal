@@ -990,6 +990,30 @@ function sumBazarDateAmounts() {
     return bazarDates.reduce((s, r) => s + (Number.isFinite(r.amount) ? r.amount : 0), 0);
 }
 
+// Same three-part label as formatBazarCostLabel, but for on-screen
+// display only — inserts a small arrow icon right before the person's
+// name, as a visual pointer to "who went". This never touches the saved
+// bazarCost text (formatBazarCostLabel stays plain), so parseCostLine /
+// the /for-all totals page are unaffected.
+function renderBazarCostDisplayLabel(descEl, row) {
+    const datePart = formatBazarDateDDMMYY(row.date);
+    const dayNamePart = row.date ? formatBazarDateDisplay(row.date) : "";
+    const namesPart = (row.names || "").trim();
+
+    descEl.textContent = "";
+    const lead = [datePart, dayNamePart].filter(Boolean).join(" ");
+    if (lead) descEl.appendChild(document.createTextNode(lead + (namesPart ? " " : "")));
+    if (namesPart) {
+        const arrow = document.createElement("i");
+        arrow.className = "fas fa-arrow-right";
+        arrow.style.margin = "0 4px";
+        arrow.style.fontSize = "0.85em";
+        arrow.style.opacity = "0.65";
+        descEl.appendChild(arrow);
+        descEl.appendChild(document.createTextNode(" " + namesPart));
+    }
+}
+
 function renderBazarCostRows() {
     if (!bazarPanel) return;
     bazarPanel.classList.toggle("visible", isBazarVisible);
@@ -1020,7 +1044,7 @@ function renderBazarCostRows() {
 
         const descEl = document.createElement("div");
         descEl.className = "cost-desc-input cost-desc-display";
-        descEl.textContent = formatBazarCostLabel(row);
+        renderBazarCostDisplayLabel(descEl, row);
         descEl.title = "Set from Bazarer Date";
 
         const amountWrap = document.createElement("div");
