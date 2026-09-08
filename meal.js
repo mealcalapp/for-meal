@@ -1502,7 +1502,23 @@ function applyMonthData(data) {
     monthNote        = typeof data?.note==="string" ? data.note : "";
     mealData         = normalizeMembers(data?.members, count);
     depositData      = normalizeDeposits(data?.deposits, count);
-    bazarDates       = normalizeBazarDates(data?.bazarDates);
+
+    // A row only gets written to Firebase once BOTH date and name are
+    // filled in (see the completeness guard in handleBazarDateInput /
+    // handleBazarDateBlur). Until then it exists only in local memory —
+    // so blindly replacing `bazarDates` with whatever the server has
+    // right now (which won't include it yet) would silently delete
+    // whatever the manager is still typing, the moment ANY other save
+    // echoes back (e.g. finishing a different row, or even this same
+    // row's own date-then-name sequence). Keep those in-progress rows
+    // around instead of dropping them.
+    const incoming = normalizeBazarDates(data?.bazarDates);
+    const incomingIds = new Set(incoming.map(r => r.id));
+    const stillPending = bazarDates.filter(r =>
+        !incomingIds.has(r.id) && (r.date || (r.names || "").trim())
+    );
+    bazarDates = [...incoming, ...stillPending];
+
     storedManagerEmail = mgrEmail;
 
     membersInput.value        = String(numPeople);
