@@ -896,6 +896,11 @@ function handleBazarDateInput(event) {
     // here — the actual DB write is still debounced below.
     renderBazarCostRows();
 
+    // Require both date AND name before anything gets written to
+    // Firebase — a row with just a date typed in (name still empty)
+    // should stay local-only until the name is filled in too.
+    if (!row.date || !(row.names || "").trim()) return;
+
     debounceKeyed("bazarDates", () => {
         saveBazarDates().catch(err => { console.error(err); showMessage("Save failed", true); });
     }, 400);
@@ -918,6 +923,10 @@ function handleBazarDateBlur(event) {
             renderBazarCostRows();
         }
     }
+
+    // Same rule as typing: leaving the field with only a date (no name
+    // yet) — or only a name (no date yet) — should NOT save.
+    if (!row.date || !(row.names || "").trim()) return;
 
     saveBazarDates(true).catch(err => { console.error(err); showMessage("Save failed", true); });
 }
@@ -942,12 +951,11 @@ function handleBazarDateClick(event) {
 
 function handleBazarDateAddRow() {
     if (!canAddBazarDate()) return;
-    const defaultDay = isCurrentMonthView() ? getTodayDay() : null;
-    const row = { id: nextBazarDateRowId(), date: defaultDay ? buildBazarDateFromDay(defaultDay) : "", names: "", amount: null };
+    const row = { id: nextBazarDateRowId(), date: "", names: "", amount: null };
     bazarDates.push(row);
     renderBazarDates();
     renderBazarCostRows();
-    const input = bazarDateRowsContainer?.querySelector(`.bazardate-row[data-row-id="${row.id}"] .bazardate-name-input`);
+    const input = bazarDateRowsContainer?.querySelector(`.bazardate-row[data-row-id="${row.id}"] .bazardate-day-input`);
     if (input) input.focus();
 }
 
