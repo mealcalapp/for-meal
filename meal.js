@@ -258,7 +258,16 @@ function normalizeDeposits(deposits, count) {
     return Array.from({length:count},(_,i)=>parseInput(src[i]));
 }
 
-function nextBazarDateRowId() { return `bd${++bazarDateRowSeq}`; }
+// Row ids MUST be globally unique, not just unique within this page load.
+// The old `bd${++counter}` restarted from 0 on every reload/device while
+// ids already saved in Firebase were bd1, bd2... — so a "new" row could get
+// the same id as a saved one, and findBazarDateRow() (which returns the
+// FIRST match) then edited the old row instead: that's the "3rd date
+// replaces the 2nd" bug. Time + random makes collisions practically impossible.
+function nextBazarDateRowId() {
+    bazarDateRowSeq++;
+    return `bd${Date.now().toString(36)}${Math.random().toString(36).slice(2,7)}${bazarDateRowSeq}`;
+}
 
 // Firebase can hand back an array or (if entries were removed leaving
 // gaps) an object keyed by index — accept either. Missing/blank ids get
@@ -267,14 +276,23 @@ function normalizeBazarDates(raw) {
     const src = Array.isArray(raw)
         ? raw
         : (raw && typeof raw==="object" ? Object.values(raw) : []);
+    // Heals data that already has duplicate ids (from the old counter bug):
+    // the 2nd+ row carrying an id that was already seen gets a fresh one,
+    // so every row can be found/edited independently again.
+    const seen = new Set();
     return src
         .filter(r => r && typeof r==="object")
-        .map(r => ({
-            id: typeof r.id==="string" && r.id ? r.id : nextBazarDateRowId(),
-            date: typeof r.date==="string" ? r.date : "",
-            names: typeof r.names==="string" ? r.names : "",
-            amount: parseCostAmount(r.amount)
-        }));
+        .map(r => {
+            let id = typeof r.id==="string" && r.id ? r.id : nextBazarDateRowId();
+            while (seen.has(id)) id = nextBazarDateRowId();
+            seen.add(id);
+            return {
+                id,
+                date: typeof r.date==="string" ? r.date : "",
+                names: typeof r.names==="string" ? r.names : "",
+                amount: parseCostAmount(r.amount)
+            };
+        });
 }
 
 // ── Firebase init ─────────────────────────────────────────────
